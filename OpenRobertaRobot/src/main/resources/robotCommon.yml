@@ -843,7 +843,7 @@ configuration:
   ARDU: [ robBrick_motor_ardu ]
   BUTTON: [ robBrick_key_ ]
   BUZZER: [ robConf_buzzer, robActions_play_tone ]
-  COLOR: [ robBrick_colour ]
+  COLOR: [ robBrick_colour, robConf_colour]
   COMPASS: [ robBrick_compass, robConf_compass ]
   DETECT_MARK: [ naoSensors_naoMark ]
   DROP: [ robConf_drop, robBrick_drop ]
