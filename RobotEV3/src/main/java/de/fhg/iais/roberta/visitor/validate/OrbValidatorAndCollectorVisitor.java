@@ -1,7 +1,5 @@
 package de.fhg.iais.roberta.visitor.validate;
 
-import java.util.Map;
-
 import com.google.common.collect.ClassToInstanceMap;
 
 import de.fhg.iais.roberta.bean.IProjectBean;
@@ -39,7 +37,6 @@ import de.fhg.iais.roberta.syntax.sensor.generic.TimerSensor;
 import de.fhg.iais.roberta.syntax.sensor.generic.TouchSensor;
 import de.fhg.iais.roberta.syntax.sensor.generic.UltrasonicSensor;
 import de.fhg.iais.roberta.visitor.IOrbVisitor;
-import de.fhg.iais.roberta.visitor.validate.DifferentialMotorValidatorAndCollectorVisitor;
 
 public class OrbValidatorAndCollectorVisitor extends DifferentialMotorValidatorAndCollectorVisitor implements IOrbVisitor<Void> {
 
@@ -71,7 +68,6 @@ public class OrbValidatorAndCollectorVisitor extends DifferentialMotorValidatorA
 	public Void visitCurveAction(CurveAction<Void> curveAction) {
 		return super.visitCurveAction(curveAction);
 	}
-
 
 	@Override
 	public Void visitDriveAction(DriveAction<Void> driveAction) {
@@ -286,24 +282,4 @@ public class OrbValidatorAndCollectorVisitor extends DifferentialMotorValidatorA
 			}
 		}
 	}
-//******************************************************
-/*
-	protected void checkSensorPort(ExternalSensor<Void> sensor){
-		ConfigurationComponent usedSensor = this.robotConfiguration.optConfigurationComponent(sensor.getUserDefinedPort());
-		if ( usedSensor == null ) {
-			addErrorToPhrase(sensor, "CONFIGURATION_ERROR_SENSOR_MISSING");
-			return;
-		} else {
-			checkSensorType(sensor, usedSensor);
-		}
-	}
-
-	private void checkSensorType(ExternalSensor<Void> sensor, ConfigurationComponent configurationComponent) {
-		String typeWithoutSensing = sensor.getKind().getName().replace("_SENSING", "");
-		if ( !(typeWithoutSensing.equalsIgnoreCase(configurationComponent.getComponentType())) ) {
-			addErrorToPhrase(sensor, "CONFIGURATION_ERROR_SENSOR_WRONG");
-		}
-	}
-*/
-//********************************************************
 }
