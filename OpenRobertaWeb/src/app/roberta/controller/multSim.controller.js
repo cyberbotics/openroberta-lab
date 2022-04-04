@@ -9,12 +9,11 @@
 import * as MSG from 'message';
 import * as UTIL from 'util';
 import * as PROGLIST from 'progList.model';
-import * as PROG_C from 'program.controller';
 import * as PROGRAM_M from 'program.model';
 import * as GUISTATE_C from 'guiState.controller';
-import * as SIM from 'simulation.simulation';
 import * as $ from 'jquery';
 import * as Blockly from 'blockly';
+import { Simulation } from 'simulation.simulation';
 
 function showListProg() {
     PROGLIST.loadProgList(function (result) {
@@ -127,7 +126,7 @@ export { showListProg };
 function simulateMultiple(programs) {
     $('#showMultipleSimPrograms').modal('hide');
     const INITIAL_WIDTH = 0.5;
-    SIM.init(programs, true, GUISTATE_C.getRobotGroup());
+    Simulation.Instance.init(programs, true, GUISTATE_C.getRobotGroup());
     $('#simCancel, #simControlStepOver, #simControlStepInto').hide();
     $('.sim').removeClass('hide');
     if ($('#blockly').hasClass('rightActive') && !$('#simButton').hasClass('rightActive')) {

@@ -238,9 +238,6 @@
       "interpreter.util": [
         "app/nepostackmachine/interpreter.util"
       ],
-      "interpreter.jsHelper": [
-        "app/nepostackmachine/interpreter.jsHelper"
-      ],
       "neuralnetwork.nn": [
         "app/neuralnetwork/neuralnetwork.nn"
       ],

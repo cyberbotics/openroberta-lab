@@ -5,7 +5,7 @@
 /**
  * Controller for multiple simulation part of the project
  */
-define(["require", "exports", "message", "util", "progList.model", "program.model", "guiState.controller", "simulation.simulation", "jquery", "blockly"], function (require, exports, MSG, UTIL, PROGLIST, PROGRAM_M, GUISTATE_C, SIM, $, Blockly) {
+define(["require", "exports", "message", "util", "progList.model", "program.model", "guiState.controller", "jquery", "blockly", "simulation.simulation"], function (require, exports, MSG, UTIL, PROGLIST, PROGRAM_M, GUISTATE_C, $, Blockly, simulation_simulation_1) {
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.showListProg = void 0;
     function showListProg() {
@@ -121,7 +121,7 @@ define(["require", "exports", "message", "util", "progList.model", "program.mode
     function simulateMultiple(programs) {
         $('#showMultipleSimPrograms').modal('hide');
         var INITIAL_WIDTH = 0.5;
-        SIM.init(programs, true, GUISTATE_C.getRobotGroup());
+        simulation_simulation_1.Simulation.Instance.init(programs, true, GUISTATE_C.getRobotGroup());
         $('#simCancel, #simControlStepOver, #simControlStepInto').hide();
         $('.sim').removeClass('hide');
         if ($('#blockly').hasClass('rightActive') && !$('#simButton').hasClass('rightActive')) {

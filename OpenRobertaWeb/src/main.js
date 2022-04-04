@@ -83,8 +83,16 @@ require.config({
         'simulation.robot.simple': 'app/simulation/simulationLogic/robot.simple',
         'simulation.robot.ev3': 'app/simulation/simulationLogic/robot.ev3',
         'simulation.robot.nxt': 'app/simulation/simulationLogic/robot.nxt',
+        BaseMobileRobot: 'app/simulation/simulationLogic/BaseMobileRobot',
+        BaseRobot: 'app/simulation/simulationLogic/BaseRobot',
+        'simulation.objects': 'app/simulation/simulationLogic/simulation.objects',
+        EV3Robot: 'app/simulation/simulationLogic/EV3Robot',
+        'robot.sensors': 'app/simulation/simulationLogic/robot.sensors',
+        'robot.actuators': 'app/simulation/simulationLogic/robot.actuators',
+        'simulation.types': 'app/simulation/simulationLogic/types',
         'simulation.scene': 'app/simulation/simulationLogic/scene',
         'simulation.simulation': 'app/simulation/simulationLogic/simulation',
+        maze: 'app/simulation/simulationLogic/maze',
 
         comm: 'helper/comm',
         log: 'helper/log',
@@ -99,7 +107,6 @@ require.config({
         'interpreter.robotSimBehaviour': 'app/nepostackmachine/interpreter.robotSimBehaviour',
         'interpreter.state': 'app/nepostackmachine/interpreter.state',
         'interpreter.util': 'app/nepostackmachine/interpreter.util',
-        'interpreter.jsHelper': 'app/nepostackmachine/interpreter.jsHelper',
 
         'neuralnetwork.nn': 'app/neuralnetwork/neuralnetwork.nn',
         'neuralnetwork.uistate': 'app/neuralnetwork/neuralnetwork.uistate',
@@ -136,7 +143,7 @@ require.config({
         },
         'volume-meter': {
             exports: 'Volume',
-            init: function () {
+            init: function() {
                 return {
                     createAudioMeter: createAudioMeter,
                 };
@@ -187,10 +194,9 @@ require([
     'webview.controller',
     'sourceCodeEditor.controller',
     'codeflask',
-    'interpreter.jsHelper',
     'confVisualization',
     'robotBlock',
-], function (require) {
+], function(require) {
     $ = require('jquery');
     WRAP = require('wrap');
     LOG = require('log');
@@ -228,7 +234,6 @@ require([
     webviewController = require('webview.controller');
     sourceCodeEditorController = require('sourceCodeEditor.controller');
     codeflask = require('codeflask');
-    stackmachineJsHelper = require('interpreter.jsHelper');
     confVisualization = require('confVisualization');
     robotBlock = require('robotBlock');
 
@@ -241,19 +246,19 @@ require([
 function init() {
     COMM.setErrorFn(handleServerErrors);
     $.when(languageController.init())
-        .then(function (language) {
+        .then(function(language) {
             return webviewController.init(language);
         })
-        .then(function (language, opt_data) {
+        .then(function(language, opt_data) {
             return guiStateController.init(language, opt_data);
         })
-        .then(function () {
+        .then(function() {
             return robotController.init();
         })
-        .then(function () {
+        .then(function() {
             return userController.init();
         })
-        .then(function () {
+        .then(function() {
             galleryListController.init();
             tutorialListController.init();
             progListController.init();
@@ -277,9 +282,9 @@ function init() {
             nnController.init();
             menuController.init();
 
-            $('.cover').fadeOut(100, function () {
+            $('.cover').fadeOut(100, function() {
                 if (guiStateController.getStartWithoutPopup()) {
-                    userModel.getStatusText(function (result) {
+                    userModel.getStatusText(function(result) {
                         if (result.statustext[0] !== '' && result.statustext[1] !== '') {
                             $('#modal-statustext').modal('show');
                         }
@@ -289,7 +294,7 @@ function init() {
                 }
             });
 
-            $('.pace').fadeOut(500);
+            $('body>.pace').fadeOut(500);
         });
 }
 

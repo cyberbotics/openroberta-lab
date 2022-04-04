@@ -71,7 +71,7 @@ export class RobotWeDoBehaviourTest extends ARobotBehaviour {
         return duration;
     }
 
-    public motorOnAction(name: string, port: number, duration: number, speed: number): number {
+    public motorOnAction(name: string, port: number, durationType: string, duration: number, speed: number, time: number): number {
         const robotText = 'robot: ' + name + ', port: ' + port;
         const durText = duration === undefined ? ' w.o. duration' : ' for ' + duration + ' msec';
         U.info(robotText + ' motor speed ' + speed + durText);

@@ -216,7 +216,7 @@ define(["require", "exports", "./interpreter.aRobotBehaviour", "./interpreter.co
             this.btInterfaceFct(cmd);
             return duration;
         };
-        RobotWeDoBehaviour.prototype.motorOnAction = function (name, port, duration, speed) {
+        RobotWeDoBehaviour.prototype.motorOnAction = function (name, port, durationType, duration, speed, time) {
             var brickid = this.getBrickIdByName(name); // TODO: better style
             var robotText = 'robot: ' + name + ', port: ' + port;
             var durText = duration === undefined ? ' w.o. duration' : ' for ' + duration + ' msec';

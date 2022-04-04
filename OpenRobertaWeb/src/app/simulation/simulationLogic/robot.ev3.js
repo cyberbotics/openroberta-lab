@@ -275,7 +275,7 @@ function Ev3(pose, configuration, num, robotBehaviour) {
             speed = speed * 0.015 + 0.5; // use range 0.5 - 2; range should be 0.1 - 10, but some voices dont accept values beyond 2
             pitch = pitch * 0.02 + 0.001; // use range 0.0 - 2.0; + 0.001 as some voices dont accept 0
 
-            var utterThis = new SpeechSynthesisUtterance(text);
+            let utterThis = new SpeechSynthesisUtterance(text);
             // https://bugs.chromium.org/p/chromium/issues/detail?id=509488#c11
             // Workaround to keep utterance object from being garbage collected by the browser
             window.utterances = [];
@@ -557,7 +557,7 @@ Ev3.prototype.update = function () {
     }
     var sin = Math.sin(this.pose.theta);
     var cos = Math.cos(this.pose.theta);
-    this.frontRight = this.translate(sin, cos, this.frontRight);
+    this.mfrontRight = this.translate(sin, cos, this.frontRight);
     this.frontLeft = this.translate(sin, cos, this.frontLeft);
     this.backRight = this.translate(sin, cos, this.backRight);
     this.backLeft = this.translate(sin, cos, this.backLeft);

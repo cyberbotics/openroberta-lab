@@ -11,13 +11,16 @@ import Scene from 'simulation.scene';
 import C from 'simulation.constants';
 import * as UTIL from 'util';
 import * as SIM_I from 'interpreter.interpreter';
-import * as MBED_R from 'interpreter.robotSimBehaviour';
+import * as ROBOT_B from 'interpreter.robotSimBehaviour';
 import * as Volume from 'volume-meter';
 import * as MSG from 'message';
 import * as $ from 'jquery';
 import * as HUEBEE from 'huebee';
 import * as Blockly from 'blockly';
 import * as NN_CTRL from 'nn.controller';
+import { Pose } from './BaseMobileRobot';
+import { SelectionListener } from './BaseRobot';
+import { Ground, SimObjectFactory, SimObjectShape, SimObjectType } from './simulation.objects';
 
 const standColorObstacle = '#33B8CA';
 const standColorArea = '#FBED00';
@@ -51,101 +54,100 @@ var obstacleListCache = [];
 var colorAreaList = [];
 var colorAreaListCache = [];
 var observers = {};
-var imgObstacle1 = new Image();
-var imgPattern = new Image();
-var imgRuler = new Image();
+var images = {};
 var mouseX;
 var mouseY;
 var firstSimStart = true;
-
+var myListener;
 var colorpicker = new HUEBEE('#colorpicker', {
     shades: 1,
     hues: 8,
     setText: false,
 });
-var imgList = [
-    '/js/app/simulation/simBackgrounds/baustelle.svg',
-    '/js/app/simulation/simBackgrounds/ruler.svg',
-    '/js/app/simulation/simBackgrounds/wallPattern.png',
-    '/js/app/simulation/simBackgrounds/calliopeBackground.svg',
-    '/js/app/simulation/simBackgrounds/microbitBackground.svg',
-    '/js/app/simulation/simBackgrounds/simpleBackground.svg',
-    '/js/app/simulation/simBackgrounds/drawBackground.svg',
-    '/js/app/simulation/simBackgrounds/robertaBackground.svg',
-    '/js/app/simulation/simBackgrounds/rescueBackground.svg',
-    '/js/app/simulation/simBackgrounds/blank.svg',
-    '/js/app/simulation/simBackgrounds/mathBackground.svg',
-];
-var imgListIE = [
-    '/js/app/simulation/simBackgrounds/baustelle.png',
-    '/js/app/simulation/simBackgrounds/ruler.png',
-    '/js/app/simulation/simBackgrounds/wallPattern.png',
-    '/js/app/simulation/simBackgrounds/calliopeBackground.png',
-    '/js/app/simulation/simBackgrounds/microbitBackground.png',
-    '/js/app/simulation/simBackgrounds/simpleBackground.png',
-    '/js/app/simulation/simBackgrounds/drawBackground.png',
-    '/js/app/simulation/simBackgrounds/robertaBackground.png',
-    '/js/app/simulation/simBackgrounds/rescueBackground.png',
-    '/js/app/simulation/simBackgrounds/blank.png',
-    '/js/app/simulation/simBackgrounds/mathBackground.png',
-];
-var imgObjectList = [];
+var imgPath = '/js/app/simulation/simBackgrounds/';
+var imgList = ['simpleBackground.svg', 'drawBackground.svg', 'robertaBackground.svg', 'rescueBackground.svg', 'blank.svg', 'mathBackground.svg'];
+var imgListIE = ['simpleBackground.png', 'drawBackground.png', 'robertaBackground.png', 'rescueBackground.png', 'blank.png', 'mathBackground.png'];
+var imgBackgroundList = [];
+// obstacles
+// scaled playground
+var ground = {};
 
-function preloadImages() {
+var redrawObstacles = false;
+var redrawColorAreas = false;
+
+function loadImages(names, files, onAllLoaded) {
+    let i = 0;
+    let numLoading = names.length;
+    const onload = function () {
+        --numLoading === 0 && onAllLoaded();
+    };
+    const images = {};
+    while (i < names.length) {
+        const img = (images[names[i]] = new Image());
+        img.onload = onload;
+        img.onerror = function (e) {
+            console.error(e);
+        };
+        img.src = imgPath + files[i++];
+    }
+    return images;
+}
+
+function loadBackgroundImages(onFirstLoaded) {
     if (isIE()) {
         imgList = imgListIE;
     }
-    var i = 0;
-    for (i = 0; i < imgList.length; i++) {
-        if (i === 0) {
-            imgObstacle1.src = imgList[i];
-        } else if (i == 1) {
-            imgRuler.src = imgList[i];
-        } else if (i == 2) {
-            imgPattern.src = imgList[i];
-        } else {
-            imgObjectList[i - 3] = new Image();
-            imgObjectList[i - 3].src = imgList[i];
-        }
-    }
-    if (UTIL.isLocalStorageAvailable()) {
-        var customBackground = localStorage.getItem('customBackground');
+    let numLoading = imgList.length;
+    const onload = function () {
+        if (--numLoading === 0) {
+            onFirstLoaded();
+            if (UTIL.isLocalStorageAvailable()) {
+                var customBackground = localStorage.getItem('customBackground');
+                if (customBackground) {
+                    // TODO backwards compatibility for non timestamped background images; can be removed after some time
+                    try {
+                        JSON.parse(customBackground);
+                    } catch (e) {
+                        localStorage.setItem(
+                            'customBackground',
+                            JSON.stringify({
+                                image: customBackground,
+                                timestamp: new Date().getTime(),
+                            })
+                        );
+                        customBackground = localStorage.getItem('customBackground');
+                    }
 
-        if (customBackground) {
-            // TODO backwards compatibility for non timestamped background images; can be removed after some time
-            try {
-                JSON.parse(customBackground);
-            } catch (e) {
-                localStorage.setItem(
-                    'customBackground',
-                    JSON.stringify({
-                        image: customBackground,
-                        timestamp: new Date().getTime(),
-                    })
-                );
-                customBackground = localStorage.getItem('customBackground');
-            }
-
-            customBackground = JSON.parse(customBackground);
-            // remove images older than 30 days
-            var currentTimestamp = new Date().getTime();
-            if (currentTimestamp - customBackground.timestamp > 63 * 24 * 60 * 60 * 1000) {
-                localStorage.removeItem('customBackground');
-            } else {
-                // add image to backgrounds if recent
-                var dataImage = customBackground.image;
-                imgObjectList[i - 3] = new Image();
-                imgObjectList[i - 3].src = 'data:image/png;base64,' + dataImage;
-                customBackgroundLoaded = true;
+                    customBackground = JSON.parse(customBackground);
+                    // remove images older than 30 days
+                    var currentTimestamp = new Date().getTime();
+                    if (currentTimestamp - customBackground.timestamp > 63 * 24 * 60 * 60 * 1000) {
+                        localStorage.removeItem('customBackground');
+                    } else {
+                        // add image to backgrounds if recent
+                        var dataImage = customBackground.image;
+                        let customBackgroundIndex = imgList.length;
+                        imgBackgroundList[customBackgroundIndex] = new Image();
+                        imgBackgroundList[customBackgroundIndex].src = 'data:image/png;base64,' + dataImage;
+                        customBackgroundLoaded = true;
+                    }
+                }
             }
         }
+    };
+    let i = 0;
+    while (i < imgList.length) {
+        const img = (imgBackgroundList[i] = new Image());
+        img.onload = onload;
+        img.onerror = function (e) {
+            console.error(e);
+        };
+        img.src = imgPath + imgList[i++];
     }
 }
 
-preloadImages();
-
-var currentBackground = 2;
-var lastBackground = 2;
+var currentBackground = 0;
+var lastBackground = 0;
 
 function setBackground(num) {
     num = num || -1;
@@ -153,10 +155,10 @@ function setBackground(num) {
     if (num === -1) {
         configData = exportConfigData();
         currentBackground += 1;
-        if (currentBackground >= imgObjectList.length) {
-            currentBackground = 2;
+        if (currentBackground >= imgBackgroundList.length) {
+            currentBackground = 0;
         }
-        if (currentBackground == imgObjectList.length - 1 && customBackgroundLoaded && UTIL.isLocalStorageAvailable()) {
+        if (currentBackground == imgBackgroundList.length - 1 && customBackgroundLoaded && UTIL.isLocalStorageAvailable()) {
             // update timestamp of custom background
             localStorage.setItem(
                 'customBackground',
@@ -170,7 +172,7 @@ function setBackground(num) {
         currentBackground = num;
     }
     var debug = robots[0].debug;
-    var moduleName = 'simulation.robot.' + simRobotType;
+    var moduleName = 'simulation.robot.' + 'EV3Robot';
 
     removeMouseEvents();
     resetSelection();
@@ -183,13 +185,13 @@ function setBackground(num) {
         scene.robots = robots;
     });
     let config = coordinates2relatives();
-    scene.resetAllCanvas(imgObjectList[currentBackground]);
+    scene.resetAllCanvas(imgBackgroundList[currentBackground]);
     relatives2coordinates(config);
     setObstacle();
     setRuler();
-    scene.drawObstacles(highLightCorners);
-    scene.drawColorAreas(highLightCorners);
-    scene.drawRuler();
+    //scene.drawObstacles(highLightCorners);
+    //scene.drawColorAreas(highLightCorners);
+    //scene.drawRuler();
     addMouseEvents();
     resizeAll();
 }
@@ -297,9 +299,9 @@ function resetPose() {
     }
     resetSelection();
     scene.resetAllCanvas(scene.backgroundImg);
-    scene.drawColorAreas(highLightCorners);
-    scene.drawObstacles(highLightCorners);
-    scene.drawRuler();
+    //scene.drawColorAreas(highLightCorners);
+    //scene.drawObstacles(highLightCorners);
+    //scene.drawRuler();
 }
 
 function deleteSelectedObject() {
@@ -318,8 +320,8 @@ function deleteSelectedObject() {
 }
 
 function addObstacle(shape) {
-    let obstacle = addObject(shape, 'obstacle', obstacleList);
-    if (selectedColorArea >= 0) {
+    let obstacle = addObject(shape, SimObjectType.Obstacle, obstacleList);
+    /*if (selectedColorArea >= 0) {
         highLightCorners = [];
         updateColorAreaLayer();
     }
@@ -327,12 +329,12 @@ function addObstacle(shape) {
     selectedObstacle = obstacleList.length - 1;
 
     highLightCorners = calculateCorners(obstacle);
-    updateObstacleLayer();
+    updateObstacleLayer();*/
 }
 
 function addColorArea(shape) {
-    let colorArea = addObject(shape, 'colorArea', colorAreaList);
-    if (selectedObstacle >= 0) {
+    let colorArea = addObject(shape, SimObjectType.ColorArea, colorAreaList);
+    /*if (selectedObstacle >= 0) {
         highLightCorners = [];
         updateObstacleLayer();
     }
@@ -340,68 +342,26 @@ function addColorArea(shape) {
     selectedColorArea = colorAreaList.length - 1;
 
     highLightCorners = calculateCorners(colorArea);
-    updateColorAreaLayer();
+    updateColorAreaLayer();*/
 }
 
 function addObject(shape, type, objectList) {
     $('#robotLayer').attr('tabindex', 0);
     $('#robotLayer').focus();
-    let newObject = {};
     let x = Math.random() * (ground.w - 200 - 100) + 100;
     let y = Math.random() * (ground.h - 100 - 100) + 100;
-    switch (shape) {
-        case 'rectangle':
-            newObject = {
-                form: 'rectangle',
-                x: x,
-                y: y,
-                w: 100,
-                h: 100,
-                theta: 0,
-                img: null,
-            };
-            break;
-        case 'triangle':
-            newObject = {
-                form: 'triangle',
-                ax: x - 50,
-                ay: y + 50,
-                bx: x,
-                by: y - 50,
-                cx: x + 50,
-                cy: y + 50,
-            };
-            break;
-        case 'circle':
-            newObject = {
-                form: 'circle',
-                x: x,
-                y: y,
-                r: 50,
-                startAngle: 50,
-                endAngle: 0,
-            };
-            break;
-        default:
-            console.error('SIMULATION: no or wrong shape');
-    }
-    if (type === 'obstacle') {
-        newObject.color = standColorObstacle;
-    } else {
-        newObject.color = standColorArea;
-    }
-    newObject.type = type;
+    let newObject = SimObjectFactory.getSimObject(myListener, shape, type, { x: x, y: y });
     objectList.push(newObject);
     enableChangeObjectButtons();
     return newObject;
 }
 
 function changeColorWithColorPicker(color) {
-    let selectedObject = selectedObstacle >= 0 ? obstacleList[selectedObstacle] : selectedColorArea >= 0 ? colorAreaList[selectedColorArea] : null;
-    if (selectedObject != null) {
-        selectedObject.color = color;
-        updateSelectedObjects();
-    }
+    let objectList = obstacleList.concat(colorAreaList); // >= 0 ? obstacleList[selectedObstacle] : selectedColorArea >= 0 ? colorAreaList[selectedColorArea] : null;
+    let myObj = objectList.filter(function (obj) {
+        return obj.selected;
+    });
+    myObj[0].color = color;
 }
 
 function toggleColorPicker() {
@@ -438,20 +398,8 @@ function stopProgram() {
     NN_CTRL.saveNN2Blockly();
 }
 
-// obstacles
-// scaled playground
-ground = {
-    x: 0,
-    y: 0,
-    w: 500,
-    h: 500,
-    isParallelToAxis: true,
-    type: 'ground',
-    form: 'rectangle',
-};
-
-var defaultObstacle = {
-    x: 0,
+var defaultObstacle;
+/*  x: 0,
     y: 0,
     xOld: 0,
     yOld: 0,
@@ -463,9 +411,9 @@ var defaultObstacle = {
     theta: 0,
     form: 'rectangle',
     type: 'obstacle',
-};
+};*/
 
-obstacleList = [defaultObstacle];
+obstacleList = [];
 
 var ruler = {
     x: 0,
@@ -514,6 +462,7 @@ function callbackOnTermination() {
 }
 
 function init(programs, refresh, robotType) {
+    myListener = (myListener && myListener.clean()) || new SelectionListener();
     mouseOnRobotIndex = -1;
     storedPrograms = programs;
     numRobots = programs.length;
@@ -525,59 +474,36 @@ function init(programs, refresh, robotType) {
     for (i = 0; i < programs.length; i++) {
         runRenderUntil[i] = 0;
     }
-    if (robotType.indexOf('calliope') >= 0 || robotType === 'microbit') {
-        if (currentBackground > 1) {
-            obstacleListCache = obstacleList;
-            colorAreaListCache = colorAreaList;
-            lastBackground = currentBackground;
-        }
-        resetScene([], []);
-        $('.dropdown.sim, .simScene, #simImport, #simResetPose, #simButtonsHead, #simEditButtons').hide();
-        if (robotType === 'microbit') {
-            currentBackground = 1;
-        } else {
-            currentBackground = 0;
-        }
-    } else if (currentBackground < 2) {
-        obstacleList = obstacleListCache;
-        colorAreaList = colorAreaListCache;
-        currentBackground = lastBackground;
-    }
-    if (currentBackground > 1) {
-        if (isIE() || isEdge()) {
-            // TODO IE and Edge: Input event not firing for file type of input
-            $('.dropdown.sim, .simScene, #simEditButtons').show();
-            $('#simImport').hide();
-        } else {
-            $('.dropdown.sim, .simScene, #simImport, #simResetPose, #simEditButtons').show();
-        }
-    }
-    $('#simButtons, #canvasDiv, #simRobot, #simValues').show();
-    $('#webotsButtons, #webotsDiv').hide();
-    interpreters = programs.map(function (x) {
-        var src = JSON.parse(x.javaScriptProgram);
-        configurations.push(x.configuration.SENSORS);
-        return new SIM_I.Interpreter(src, new MBED_R.RobotMbedBehaviour(), callbackOnTermination, breakpoints);
-    });
-    updateDebugMode(debugMode);
-
+    obstacleListCache = obstacleList;
+    colorAreaListCache = colorAreaList;
     isDownRobots = [];
     for (var i = 0; i < numRobots; i++) {
         isDownRobots.push(false);
     }
+    interpreters = programs.map(function (x) {
+        var src = JSON.parse(x.javaScriptProgram);
+        configurations.push(x.configuration.SENSORS);
+        return new SIM_I.Interpreter(src, new ROBOT_B.RobotMbedBehaviour(), callbackOnTermination, breakpoints);
+    });
     if (refresh) {
+        $('#robotLayer').off();
+        robots = [];
+        obstacleList = [];
+        obstacleList.push(SimObjectFactory.getSimObject(myListener, SimObjectShape.Circle, SimObjectType.Obstacle, { x: 100, y: 100 }));
+        $('#simProgress').fadeIn('fast');
         robotIndex = 0;
         robots = [];
         readyRobots = [];
         isDownRobots = [];
-        var moduleName = 'simulation.robot.' + simRobotType;
+        var moduleName = 'simulation.robot.' + 'EV3Robot';
+
         require([moduleName], function (reqRobot) {
             createRobots(reqRobot.default, numRobots);
             for (var i = 0; i < numRobots; i++) {
                 robots[i].reset();
-                robots[i].resetPose();
-                readyRobots.push(false);
-                isDownRobots.push(false);
+                //robots[i].resetPose();
+                //readyRobots.push(false);
+                //isDownRobots.push(false);
             }
             removeMouseEvents();
             canceled = false;
@@ -588,12 +514,39 @@ function init(programs, refresh, robotType) {
             stepCounter = 0;
             pause = true;
             info = false;
-            if (firstSimStart && currentBackground > 1) {
-                setObstacle();
-                firstSimStart = false;
+            let imgType = '.svg';
+            if (isIE()) {
+                imgType = '.png';
             }
-            setRuler();
-            initScene();
+            if (robots[0].idle) {
+                images = loadImages(['backgroundImg'], [simRobotType + 'Background' + imgType], function () {
+                    currentBackground = 0;
+                    imgBackgroundList[currentBackground] = images.backgroundImg;
+                    initScene();
+                    $('.dropdown.sim, .simScene, #simImport, #simResetPose, #simButtonsHead, #simEditButtons').hide();
+                    $('.pace').fadeOut('fast');
+                });
+            } else {
+                images = loadImages(['obstacle1', 'pattern', 'ruler'], ['baustelle' + imgType, 'wallPattern.png', 'ruler' + imgType], function () {
+                    loadBackgroundImages(function () {
+                        if (isIE() || isEdge()) {
+                            // TODO IE and Edge: Input event not firing for file type of input
+                            $('.dropdown.sim, .simScene, #simEditButtons').show();
+                            $('#simImport').hide();
+                        } else {
+                            $('.dropdown.sim, .simScene, #simImport, #simResetPose, #simEditButtons').show();
+                        }
+                        if (firstSimStart && currentBackground > 1) {
+                            setObstacle();
+                            firstSimStart = false;
+                        }
+                        setRuler();
+                        ground = new Ground(10, 10, imgBackgroundList[currentBackground].width, imgBackgroundList[currentBackground].height);
+                        initScene();
+                        $('.pace').fadeOut('fast');
+                    });
+                });
+            }
         });
     } else {
         for (var i = 0; i < numRobots; i++) {
@@ -604,6 +557,11 @@ function init(programs, refresh, robotType) {
         }
         resetButtons();
     }
+
+    $('#simButtons, #canvasDiv').show();
+    $('#webotsButtons, #webotsDiv').hide();
+
+    updateDebugMode(debugMode);
 }
 
 function run(refresh, robotType) {
@@ -669,12 +627,14 @@ function render() {
             } else if (reset || (allInterpretersTerminated() && !robots[i].endless)) {
                 reset = false;
                 for (var j = 0; j < robots.length; j++) {
-                    robots[j].buttons.Reset = false;
+                    /*robots[j].buttons.Reset = false;*/
                     robots[j].pause = true;
                     robots[j].reset();
                 }
                 removeMouseEvents();
-                scene.drawRobots();
+                scene.draw(redrawObstacles, redrawColorAreas);
+                redrawColorAreas = false;
+                redrawObstacles = false;
 
                 // some time to cancel all timeouts
                 setTimeout(function () {
@@ -692,7 +652,7 @@ function render() {
                 }
             }
         }
-        robots[i] && robots[i].update();
+        robots[i] && robots[i].updateActions(dt);
         updateBreakpointEvent();
     }
     var renderTimeStart = new Date().getTime();
@@ -811,17 +771,17 @@ function setObstacle() {
             standObst.form = 'rectangle';
     }
     standObst.type = 'obstacle';
-    obstacleList.push(defaultObstacle);
-    obstacleList[0] = standObst;
+    //obstacleList.push(SimObjectFactory.getSimObject(myListener, SimObjectShape.Rectangle, SimObjectType.Obstacle, { x: 0, y: 0 }));
+    //obstacleList[0] = standObst;
 }
 
 function setRuler() {
-    if (currentBackground == 4) {
+    if (currentBackground == 2) {
         ruler.x = 430;
         ruler.y = 400;
         ruler.w = 300;
         ruler.h = 30;
-        ruler.img = imgRuler;
+        ruler.img = images.ruler;
         ruler.color = '#ff0000';
     } else {
         // All other scenes currently don't have a movable ruler.
@@ -838,36 +798,7 @@ function handleKeyEvent(e) {
     var keyName = e.key;
     var keyCode = e.keyCode;
     let selectedObject = selectedObstacle >= 0 ? obstacleList[selectedObstacle] : selectedColorArea >= 0 ? colorAreaList[selectedColorArea] : null;
-    if (selectedRobot >= 0) {
-        if (robots[selectedRobot].drawWidth) {
-            robots[selectedRobot].canDraw = false;
-        }
-        switch (keyName) {
-            case 'ArrowUp':
-                robots[selectedRobot].pose.x += Math.cos(robots[selectedRobot].pose.theta);
-                robots[selectedRobot].pose.y += Math.sin(robots[selectedRobot].pose.theta);
-                e.preventDefault();
-                e.stopPropagation();
-                break;
-            case 'ArrowLeft':
-                robots[robotIndex].pose.theta -= Math.PI / 180;
-                e.preventDefault();
-                e.stopPropagation();
-                break;
-            case 'ArrowDown':
-                robots[selectedRobot].pose.x -= Math.cos(robots[selectedRobot].pose.theta);
-                robots[selectedRobot].pose.y -= Math.sin(robots[selectedRobot].pose.theta);
-                e.preventDefault();
-                e.stopPropagation();
-                break;
-            case 'ArrowRight':
-                robots[selectedRobot].pose.theta += Math.PI / 180;
-                e.preventDefault();
-                e.stopPropagation();
-                break;
-            default:
-        }
-    } else if (selectedObject) {
+    if (selectedObject) {
         const shift = 5;
         switch (keyName) {
             case 'ArrowUp':
@@ -1008,6 +939,7 @@ function enableChangeObjectButtons() {
 }
 
 function handleMouseDown(e) {
+    return;
     e.preventDefault();
     e.stopPropagation();
     var X = e.clientX || e.originalEvent.touches[0].pageX;
@@ -1210,34 +1142,25 @@ function resetSelection() {
     downObstacle = -1;
 }
 
-function handleMouseUp(e) {
-    $('#robotLayer').css('cursor', 'auto');
-    if (selectedRobot >= 0 && robots[selectedRobot].drawWidth) {
-        robots[selectedRobot].canDraw = true;
-    }
-    handleMouseOut(e);
-}
-
-function handleMouseOut(e) {
-    e.preventDefault();
+function handleMouse(e) {
     e.stopPropagation();
-    downCorner = -1;
-    downRuler = false;
-    downRobot = -1;
-    downColorArea = -1;
-    downObstacle = -1;
+    $('#robotLayer').css('cursor', 'auto');
+    if (e.type === 'mousedown' || e.type === 'touchstart') {
+        myListener.fire(null);
+    }
 }
 
 function updateColorAreaLayer() {
-    scene.drawColorAreas(highLightCorners);
+    //scene.drawColorAreas(highLightCorners);
 }
 
 function updateObstacleLayer() {
-    scene.drawRuler();
-    scene.drawObstacles(highLightCorners);
+    //scene.drawRuler();
+    //scene.drawObstacles(highLightCorners);
 }
 
 function handleMouseMove(e) {
+    return;
     e.preventDefault();
     $('#robotLayer').css('cursor', 'default');
     var X = e.clientX || e.originalEvent.touches[0].pageX;
@@ -1353,6 +1276,7 @@ function handleMouseMove(e) {
         }
         highLightCorners = calculateCorners(object);
     }
+
     let hoverCorners = false;
     for (var i = 0; i < highLightCorners.length; i++) {
         let corner = highLightCorners[i];
@@ -1426,12 +1350,6 @@ function handleMouseMove(e) {
                     obstacle.y += dy;
                     break;
                 case 'triangle':
-                    obstacle.ax += dx;
-                    obstacle.ay += dy;
-                    obstacle.bx += dx;
-                    obstacle.by += dy;
-                    obstacle.cx += dx;
-                    obstacle.cy += dy;
                     break;
                 default:
             }
@@ -1485,7 +1403,7 @@ function handleMouseMove(e) {
         if (downRuler) {
             ruler.x += dx;
             ruler.y += dy;
-            scene.drawRuler();
+            //scene.drawRuler();
             e.preventDefault();
             return;
         }
@@ -1536,7 +1454,7 @@ function handleMouseWheel(e) {
     }
     if (zoom) {
         scene.resizeBackgrounds(scale);
-        scene.drawRuler();
+        //scene.drawRuler();
         updateSelectedObjects();
         e.stopPropagation();
     }
@@ -1551,66 +1469,41 @@ function resizeAll() {
         scene.playground.h = $(window).height() - offsetY;
         ground.x = 10;
         ground.y = 10;
-        ground.w = imgObjectList[currentBackground].width;
-        ground.h = imgObjectList[currentBackground].height;
+        ground.w = imgBackgroundList[currentBackground].width;
+        ground.h = imgBackgroundList[currentBackground].height;
         var scaleX = scene.playground.w / (ground.w + 20);
         var scaleY = scene.playground.h / (ground.h + 20);
         scale = Math.min(scaleX, scaleY) - 0.05;
         scene.resizeBackgrounds(scale);
-        scene.drawRuler();
+        //scene.drawRuler();
         updateSelectedObjects();
     }
 }
 
 function updateSelectedObjects() {
     if (selectedObstacle >= 0) {
-        scene.drawColorAreas([]);
+        //scene.drawColorAreas([]);
         updateObstacleLayer();
         return;
     }
     if (selectedColorArea >= 0) {
-        scene.drawObstacles([]);
+        //scene.drawObstacles([]);
         updateColorAreaLayer();
         return;
     }
-    scene.drawObstacles([]);
-    scene.drawColorAreas([]);
+    //scene.drawObstacles([]);
+    //scene.drawColorAreas([]);
 }
 
 function addMouseEvents() {
-    removeMouseEvents();
-    $('#robotLayer').on('mousedown touchstart', function (e) {
-        if (robots[robotIndex].handleMouseDown) {
-            robots[robotIndex].handleMouseDown(e, offsetX, offsetY, scale, scene.playground.w / 2, scene.playground.h / 2);
-        } else {
-            handleMouseDown(e);
-        }
-    });
-    $('#robotLayer').on('mousemove touchmove', function (e) {
-        if (robots[robotIndex].handleMouseMove) {
-            robots[robotIndex].handleMouseMove(e, offsetX, offsetY, scale, scene.playground.w / 2, scene.playground.h / 2);
-        } else {
-            handleMouseMove(e);
-        }
-    });
-    $('#robotLayer').on('mouseup touchend', function (e) {
-        if (robots[robotIndex].handleMouseUp) {
-            robots[robotIndex].handleMouseUp(e, offsetX, offsetY, scale, scene.playground.w / 2, scene.playground.h / 2);
-        } else {
-            handleMouseUp(e);
-        }
-    });
-    $('#robotLayer').on('mouseout touchcancel', function (e) {
-        if (robots[robotIndex].handleMouseOut) {
-            robots[robotIndex].handleMouseOut(e, offsetX, offsetY, scene.playground.w / 2, scene.playground.h / 2);
-        } else {
-            handleMouseOut(e);
-        }
+    $('#canvasDiv').on('mousedown touchstart mousemove touchmove mouseup touchend mouseout touchcancel', function (e) {
+        // handle any mouse event that is not captured by the object's mouse listener on the specific layers
+        handleMouse(e);
     });
     $('#simDiv').on('wheel mousewheel touchmove', function (e) {
         handleMouseWheel(e);
     });
-    $('#canvasDiv').draggable();
+    //$('#canvasDiv').draggable();
     $('#robotLayer').attr('tabindex', 0);
     $('#robotLayer').on('click touchstart', function (e) {
         $('#robotLayer').attr('tabindex', 0);
@@ -1641,7 +1534,6 @@ function setFocusBlocklyDiv(e) {
 }
 
 function removeMouseEvents() {
-    $('#robotLayer').off();
     $('#simDiv').off();
     $('#canvasDiv').off();
     $('#robotIndex').off();
@@ -1650,32 +1542,32 @@ function removeMouseEvents() {
 
 function initScene() {
     cancelAnimationFrame(globalID);
-    scene = new Scene(imgObjectList[currentBackground], robots, imgPattern, ruler);
-    scene.drawRobots();
+    scene = new Scene(imgBackgroundList[currentBackground], robots, images.pattern, ruler);
+    //scene.drawRobots();
     resetSelection();
     addMouseEvents();
     disableChangeObjectButtons();
-    if (robots[0].colorRange) {
-        colorpicker = new HUEBEE('#colorpicker', {
-            shades: 1,
-            hues: 8,
-            customColors: robots[0].colorRange,
-            setText: false,
-        });
-        colorpicker.on('change', function (color) {
-            changeColorWithColorPicker(color);
-        });
-        let close = HUEBEE.prototype.close;
-        HUEBEE.prototype.close = function () {
-            $('.huebee__container').off('mouseup touchend', resetColorpickerCursor);
-            close.apply(this);
-        };
-        let open = HUEBEE.prototype.open;
-        HUEBEE.prototype.open = function () {
-            open.apply(this);
-            $('.huebee__container').on('mouseup touchend', resetColorpickerCursor);
-        };
-    }
+    //if (robots[0].colorRange) {
+    colorpicker = new HUEBEE('#colorpicker', {
+        shades: 1,
+        hues: 8,
+        //customColors: robots[0].colorRange,
+        setText: false,
+    });
+    colorpicker.on('change', function (color) {
+        changeColorWithColorPicker(color);
+    });
+    let close = HUEBEE.prototype.close;
+    HUEBEE.prototype.close = function () {
+        $('.huebee__container').off('mouseup touchend', resetColorpickerCursor);
+        close.apply(this);
+    };
+    let open = HUEBEE.prototype.open;
+    HUEBEE.prototype.open = function () {
+        open.apply(this);
+        $('.huebee__container').on('mouseup touchend', resetColorpickerCursor);
+    };
+    //}
     for (var i = 0; i < numRobots; i++) {
         readyRobots[i] = true;
     }
@@ -1748,6 +1640,7 @@ function coordinates2relatives() {
     let height = $('#unitBackgroundLayer').height();
     let width = $('#unitBackgroundLayer').width();
     let relatives = {};
+
     function calculateShape(object) {
         switch (object.form) {
             case 'rectangle':
@@ -1786,17 +1679,12 @@ function coordinates2relatives() {
                 };
         }
     }
+
     relatives.robotPoses = robots.map(function (robot) {
         return {
             x: robot.pose.x / width,
             y: robot.pose.y / height,
             theta: robot.pose.theta,
-            xOld: robot.pose.x / width,
-            yOld: robot.pose.y / height,
-            transX: 0,
-            transY: 0,
-            thetaOld: robot.pose.thetaOld,
-            thetaDiff: 0,
         };
     });
     relatives.obstacles = obstacleList.map(function (object) {
@@ -1812,6 +1700,7 @@ function coordinates2relatives() {
 function relatives2coordinates(relatives) {
     let height = $('#unitBackgroundLayer').height();
     let width = $('#unitBackgroundLayer').width();
+
     function calculateShape(object) {
         switch (object.form) {
             case 'rectangle':
@@ -1850,6 +1739,7 @@ function relatives2coordinates(relatives) {
                 };
         }
     }
+
     for (var i = 0; i < robots.length; i++) {
         if (relatives.robotPoses[i]) {
             robots[i].pose.x = relatives.robotPoses[i].x * width;
@@ -1889,12 +1779,14 @@ function importImage() {
                 var scaleX = 1;
                 var scaleY = 1;
                 // - 20 because of the border pattern which is 10 pixels wide on both sides
-                if (img.width > C.MAX_WIDTH - 20) {
+                /*if (img.width > C.MAX_WIDTH - 20) {
                     scaleX = (C.MAX_WIDTH - 20) / img.width;
                 }
                 if (img.height > C.MAX_HEIGHT - 20) {
                     scaleY = (C.MAX_HEIGHT - 20) / img.height;
                 }
+                */
+
                 var scale = Math.min(scaleX, scaleY);
                 canvas.width = img.width * scale;
                 canvas.height = img.height * scale;
@@ -1907,11 +1799,11 @@ function importImage() {
                 image.onload = function () {
                     if (customBackgroundLoaded) {
                         // replace previous image
-                        imgObjectList[imgObjectList.length - 1] = image;
+                        imgBackgroundList[imgBackgroundList.length - 1] = image;
                     } else {
-                        imgObjectList[imgObjectList.length] = image;
+                        imgBackgroundList[imgBackgroundList.length] = image;
                     }
-                    setBackground(imgObjectList.length - 1);
+                    setBackground(imgBackgroundList.length - 1);
                     initScene();
                 };
 
@@ -1949,7 +1841,6 @@ function arrToRgb(values) {
 
 function createRobots(reqRobot, numRobots) {
     $('#simRobotContent').empty();
-    robots = [];
     if (numRobots >= 1) {
         var tempRobot = createRobot(reqRobot, configurations[0], 0, 0, interpreters[0].getRobotBehaviour());
         tempRobot.savedName = userPrograms[0].savedName;
@@ -1962,7 +1853,7 @@ function createRobots(reqRobot, numRobots) {
             tempRobot = createRobot(reqRobot, configurations[i], i, yOffset, interpreters[i].getRobotBehaviour());
             tempRobot.savedName = userPrograms[i].savedName;
             var tempcolor = arrToRgb(colorsAdmissible[(i - 1) % colorsAdmissible.length]);
-            tempRobot.geom.color = tempcolor;
+            tempRobot.chassis.geom.color = tempcolor;
             robots[i] = tempRobot;
             if (robots[i].brick) {
                 $('#simRobotContent').append(robots[i].brick);
@@ -1977,135 +1868,84 @@ function createRobots(reqRobot, numRobots) {
 
 function createRobot(reqRobot, configuration, num, optYOffset, robotBehaviour) {
     var yOffset = optYOffset || 0;
-    var robot;
-    if (currentBackground == 2) {
-        robot = new reqRobot(
-            {
-                x: 240,
-                y: 200 + yOffset,
-                theta: 0,
-                xOld: 240,
-                yOld: 200 + yOffset,
-                transX: 0,
-                transY: 0,
-            },
-            configuration,
-            num,
-            robotBehaviour
-        );
-        robot.canDraw = false;
-    } else if (currentBackground == 3) {
-        robot = new reqRobot(
-            {
-                x: 200,
-                y: 200 + yOffset,
-                theta: 0,
-                xOld: 200,
-                yOld: 200 + yOffset,
-                transX: 0,
-                transY: 0,
-            },
-            configuration,
-            num,
-            robotBehaviour
-        );
-        robot.canDraw = true;
-        robot.drawColor = '#000000';
-        robot.drawWidth = 10;
-    } else if (currentBackground == 4) {
-        var robotY = 104 + yOffset;
-        if (num >= 2) {
-            robotY = 104 + 60 * (num - 1);
+    const robot = new reqRobot(num, configuration, robotBehaviour, myListener);
+    if (robot.mobile) {
+        switch (currentBackground) {
+            case 0: {
+                robot.pose = new Pose(200, 200 + yOffset, 0);
+                //robot.canDraw = false;
+                break;
+            }
+            case 1: {
+                robot.pose = new Pose({
+                    x: 200,
+                    y: 200 + yOffset,
+                    theta: 0,
+                });
+                robot.canDraw = true;
+                robot.drawColor = '#000000';
+                robot.drawWidth = 10;
+                break;
+            }
+            case 2: {
+                var robotY = 104 + yOffset;
+                if (num >= 2) {
+                    robotY = 104 + 60 * (num - 1);
+                }
+                robot.pose = new Pose({
+                    x: 70,
+                    y: robotY,
+                    theta: 0,
+                });
+                robot.canDraw = false;
+                break;
+            }
+            case 3: {
+                robot.pose = new Pose({
+                    x: 400,
+                    y: 50 + 60 * num,
+                    theta: 0,
+                });
+                //robot.canDraw = false;
+                break;
+            }
+            case 4: {
+                var robotY = 440 + yOffset;
+                if (num > 2) {
+                    robotY = 440 - 60 * (num - 1);
+                }
+                robot.pose = new Pose({
+                    x: 800,
+                    y: robotY,
+                    theta: -Math.PI / 2,
+                });
+                //robot.canDraw = false;
+                break;
+            }
+            case 5: {
+                var cx = imgBackgroundList[currentBackground].width / 2.0 + 10;
+                var cy = imgBackgroundList[currentBackground].height / 2.0 + 10;
+                robot.pose = new Pose({
+                    x: cx,
+                    y: cy + yOffset,
+                    theta: 0,
+                });
+                // robot.canDraw = true;
+                // robot.drawColor = '#ffffff';
+                // robot.drawWidth = 1;
+                break;
+            }
+            default: {
+                var cx = imgBackgroundList[currentBackground].width / 2.0 + 10;
+                var cy = imgBackgroundList[currentBackground].height / 2.0 + 10;
+                robot.pose = new Pose({
+                    x: cx,
+                    y: cy + yOffset,
+                    theta: 0,
+                });
+                //robot.canDraw = false;
+            }
         }
-        robot = new reqRobot(
-            {
-                x: 70,
-                y: robotY,
-                theta: 0,
-                xOld: 70,
-                yOld: 104 + yOffset,
-                transX: 0,
-                transY: 0,
-            },
-            configuration,
-            num,
-            robotBehaviour
-        );
-        robot.canDraw = false;
-    } else if (currentBackground == 5) {
-        robot = new reqRobot(
-            {
-                x: 400,
-                y: 50 + 60 * num,
-                theta: 0,
-                xOld: 400,
-                yOld: 50 + yOffset,
-                transX: 0,
-                transY: 0,
-            },
-            configuration,
-            num,
-            robotBehaviour
-        );
-        robot.canDraw = false;
-    } else if (currentBackground == 6) {
-        var robotY = 440 + yOffset;
-        if (num > 2) {
-            robotY = 440 - 60 * (num - 1);
-        }
-        robot = new reqRobot(
-            {
-                x: 800,
-                y: robotY,
-                theta: -Math.PI / 2,
-                xOld: 800,
-                yOld: 440 + yOffset,
-                transX: 0,
-                transY: 0,
-            },
-            configuration,
-            num,
-            robotBehaviour
-        );
-        robot.canDraw = false;
-    } else if (currentBackground == 7) {
-        var cx = imgObjectList[currentBackground].width / 2.0 + 10;
-        var cy = imgObjectList[currentBackground].height / 2.0 + 10;
-        robot = new reqRobot(
-            {
-                x: cx,
-                y: cy + yOffset,
-                theta: 0,
-                xOld: cx,
-                yOld: cy + yOffset,
-                transX: -cx,
-                transY: -cy,
-            },
-            configuration,
-            num,
-            robotBehaviour
-        );
-        robot.canDraw = true;
-        robot.drawColor = '#ffffff';
-        robot.drawWidth = 1;
-    } else {
-        var cx = imgObjectList[currentBackground].width / 2.0 + 10;
-        var cy = imgObjectList[currentBackground].height / 2.0 + 10;
-        robot = new reqRobot(
-            {
-                x: cx,
-                y: cy + yOffset,
-                theta: 0,
-                xOld: cx,
-                yOld: cy + yOffset,
-                transX: 0,
-                transY: 0,
-            },
-            configuration,
-            num,
-            robotBehaviour
-        );
-        robot.canDraw = false;
     }
     return robot;
 }

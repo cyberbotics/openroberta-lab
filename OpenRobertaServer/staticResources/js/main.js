@@ -81,8 +81,16 @@ require.config({
         'simulation.robot.simple': 'app/simulation/simulationLogic/robot.simple',
         'simulation.robot.ev3': 'app/simulation/simulationLogic/robot.ev3',
         'simulation.robot.nxt': 'app/simulation/simulationLogic/robot.nxt',
+        BaseMobileRobot: 'app/simulation/simulationLogic/BaseMobileRobot',
+        BaseRobot: 'app/simulation/simulationLogic/BaseRobot',
+        'simulation.objects': 'app/simulation/simulationLogic/simulation.objects',
+        EV3Robot: 'app/simulation/simulationLogic/EV3Robot',
+        'robot.sensors': 'app/simulation/simulationLogic/robot.sensors',
+        'robot.actuators': 'app/simulation/simulationLogic/robot.actuators',
+        'simulation.types': 'app/simulation/simulationLogic/types',
         'simulation.scene': 'app/simulation/simulationLogic/scene',
         'simulation.simulation': 'app/simulation/simulationLogic/simulation',
+        maze: 'app/simulation/simulationLogic/maze',
         comm: 'helper/comm',
         log: 'helper/log',
         message: 'helper/msg',
@@ -95,7 +103,6 @@ require.config({
         'interpreter.robotSimBehaviour': 'app/nepostackmachine/interpreter.robotSimBehaviour',
         'interpreter.state': 'app/nepostackmachine/interpreter.state',
         'interpreter.util': 'app/nepostackmachine/interpreter.util',
-        'interpreter.jsHelper': 'app/nepostackmachine/interpreter.jsHelper',
         'neuralnetwork.nn': 'app/neuralnetwork/neuralnetwork.nn',
         'neuralnetwork.uistate': 'app/neuralnetwork/neuralnetwork.uistate',
         'neuralnetwork.ui': 'app/neuralnetwork/neuralnetwork.ui',
@@ -179,7 +186,6 @@ require([
     'webview.controller',
     'sourceCodeEditor.controller',
     'codeflask',
-    'interpreter.jsHelper',
     'confVisualization',
     'robotBlock',
 ], function (require) {
@@ -220,7 +226,6 @@ require([
     webviewController = require('webview.controller');
     sourceCodeEditorController = require('sourceCodeEditor.controller');
     codeflask = require('codeflask');
-    stackmachineJsHelper = require('interpreter.jsHelper');
     confVisualization = require('confVisualization');
     robotBlock = require('robotBlock');
     $(document).ready(WRAP.wrapTotal(init, 'page init'));
@@ -278,7 +283,7 @@ function init() {
                 $('#show-startup-message').modal('show');
             }
         });
-        $('.pace').fadeOut(500);
+        $('body>.pace').fadeOut(500);
     });
 }
 /**

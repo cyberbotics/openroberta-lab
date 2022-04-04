@@ -1,6 +1,35 @@
 define(["require", "exports", "message", "log", "jquery", "blockly", "simulation.constants", "guiState.controller", "webots.simulation", "jquery-validate", "bootstrap"], function (require, exports, MSG, LOG, $, Blockly, simulation_constants_1, GUISTATE_C, WEBOTSIM) {
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.toFixedPrecision = exports.closeSimRobotWindow = exports.openSimRobotWindow = exports.removeLinks = exports.annotateBlocks = exports.clearAnnotations = exports.clearTabAlert = exports.alertTab = exports.isLocalStorageAvailable = exports.countBlocks = exports.getHashFrom = exports.download = exports.getBasename = exports.sgn = exports.roundUltraSound = exports.round = exports.response = exports.showMsgOnTop = exports.showSingleListModal = exports.showSingleModal = exports.setFocusOnElement = exports.checkVisibility = exports.calcDataTableHeight = exports.formatResultLog = exports.parseDate = exports.formatDate = exports.setObjectProperty = exports.getPropertyFromObject = exports.isEmpty = exports.clone = exports.base64decode = void 0;
+    exports.toFixedPrecision = exports.closeSimRobotWindow = exports.openSimRobotWindow = exports.removeLinks = exports.annotateBlocks = exports.clearAnnotations = exports.clearTabAlert = exports.alertTab = exports.isLocalStorageAvailable = exports.countBlocks = exports.getHashFrom = exports.download = exports.getBasename = exports.sgn = exports.roundUltraSound = exports.round = exports.response = exports.showMsgOnTop = exports.showSingleListModal = exports.showSingleModal = exports.setFocusOnElement = exports.checkVisibility = exports.calcDataTableHeight = exports.formatResultLog = exports.parseDate = exports.formatDate = exports.setObjectProperty = exports.getPropertyFromObject = exports.isEmpty = exports.clone = exports.base64decode = exports.addVariableValue = exports.extendMouseEvent = exports.getWebAudio = exports.initMicrophone = exports.isEdge = exports.isIE = exports.checkInCircle = exports.getLinesFromRectangle = void 0;
+    function getLinesFromRectangle(myObj) {
+        return [
+            {
+                x1: myObj.x,
+                x2: myObj.x,
+                y1: myObj.y,
+                y2: myObj.y + myObj.h,
+            },
+            {
+                x1: myObj.x,
+                x2: myObj.x + myObj.w,
+                y1: myObj.y,
+                y2: myObj.y,
+            },
+            {
+                x1: myObj.x + myObj.w,
+                x2: myObj.x,
+                y1: myObj.y + myObj.h,
+                y2: myObj.y + myObj.h,
+            },
+            {
+                x1: myObj.x + myObj.w,
+                x2: myObj.x + myObj.w,
+                y1: myObj.y + myObj.h,
+                y2: myObj.y,
+            },
+        ];
+    }
+    exports.getLinesFromRectangle = getLinesFromRectangle;
     var ANIMATION_DURATION = simulation_constants_1.default.ANIMATION_DURATION;
     var ratioWorkspace = 1;
     var simRobotWindowPositions = [];
@@ -210,13 +239,13 @@ define(["require", "exports", "message", "log", "jquery", "blockly", "simulation
         $('#single-modal-form').onWrap('submit', function (e) {
             e.preventDefault();
             onSubmit();
-        });
+        }, 'sim start clicked');
         $('#single-modal').onWrap('hidden.bs.modal', function () {
             $('#single-modal-form').off('submit');
             $('#singleModalInput').val('');
             $('#single-modal-form').validate().resetForm();
             onHidden();
-        });
+        }, 'sim start clicked');
         $('#single-modal-form').removeData('validator');
         $('#single-modal-form').validate(validator);
         setFocusOnElement($('#singleModalInput'));
@@ -227,11 +256,11 @@ define(["require", "exports", "message", "log", "jquery", "blockly", "simulation
         $('#single-modal-list-form').onWrap('submit', function (e) {
             e.preventDefault();
             onSubmit();
-        });
+        }, 'sim start clicked');
         $('#single-modal-list').onWrap('hidden.bs.modal', function () {
             $('#single-modal-list-form').unbind('submit');
             onHidden();
-        });
+        }, 'sim start clicked');
         setFocusOnElement($('#singleModalListInput'));
         $('#single-modal-list').modal('show');
     }
@@ -552,7 +581,7 @@ define(["require", "exports", "message", "log", "jquery", "blockly", "simulation
                 that.width($('#main-section').outerWidth() - now);
                 $('.rightMenuButton').css('right', now);
                 ratioWorkspace = $('#blockly').outerWidth() / $('#main-section').outerWidth();
-                $(window).resize();
+                $(window).trigger('resize');
             },
             done: function () {
                 that.width($('#main-section').outerWidth());
@@ -562,7 +591,7 @@ define(["require", "exports", "message", "log", "jquery", "blockly", "simulation
                 that.removeClass('rightActive');
                 $('.fromRight.rightActive').removeClass('rightActive');
                 $('#sliderDiv').hide();
-                $(window).resize();
+                $(window).trigger('resize');
                 if (typeof opt_callBack == 'function') {
                     opt_callBack();
                 }
@@ -595,7 +624,7 @@ define(["require", "exports", "message", "log", "jquery", "blockly", "simulation
             $('.fromRight.rightActive').removeClass('rightActive');
             $('.rightMenuButton.rightActive').removeClass('rightActive');
             $('#' + viewName + 'Div, #' + buttonName + 'Button').addClass('rightActive');
-            $(window).resize();
+            $(window).trigger('resize');
             if (smallScreen) {
                 $('.blocklyToolboxDiv').css('display', 'none');
             }
@@ -619,14 +648,14 @@ define(["require", "exports", "message", "log", "jquery", "blockly", "simulation
                 that.width($('#main-section').outerWidth() - now);
                 $('.rightMenuButton').css('right', now);
                 ratioWorkspace = $('#blockly').outerWidth() / $('#main-section').outerWidth();
-                $(window).resize();
+                $(window).trigger('resize');
             },
             done: function () {
                 $('#sliderDiv').show();
                 that.width($('#main-section').outerWidth() - $('.fromRight.rightActive').width());
                 $('.rightMenuButton').css('right', $('.fromRight.rightActive').width());
                 ratioWorkspace = $('#blockly').outerWidth() / $('#main-section').outerWidth();
-                $(window).resize();
+                $(window).trigger('resize');
                 if (smallScreen) {
                     $('.blocklyToolboxDiv').css('display', 'none');
                 }
@@ -642,7 +671,7 @@ define(["require", "exports", "message", "log", "jquery", "blockly", "simulation
             },
         });
     };
-    $(window).resize(function () {
+    $(window).on('resize', function () {
         var parentWidth = $('#main-section').outerWidth();
         var height = Math.max($('#blockly').outerHeight(), $('#brickly').outerHeight());
         var rightWidth = (1 - ratioWorkspace) * parentWidth;
@@ -760,6 +789,10 @@ define(["require", "exports", "message", "log", "jquery", "blockly", "simulation
         });
     }
     exports.removeLinks = removeLinks;
+    function checkInCircle(px, py, cx, cy, r) {
+        return (px - cx) * (px - cx) + (py - cy) * (py - cy) <= r * r;
+    }
+    exports.checkInCircle = checkInCircle;
     /**
      * open simRobotWindow if it was previously closed with
      * closeSimRobotWindow() and the robot has not been changed
@@ -809,9 +842,104 @@ define(["require", "exports", "message", "log", "jquery", "blockly", "simulation
         }, duration);
     }
     exports.closeSimRobotWindow = closeSimRobotWindow;
+    function isIE() {
+        var ua = window.navigator.userAgent;
+        var ie = ua.indexOf('MSIE ');
+        var ie11 = ua.indexOf('Trident/');
+        if (ie > -1 || ie11 > -1) {
+            return true;
+        }
+        return false;
+    }
+    exports.isIE = isIE;
+    function isEdge() {
+        var ua = window.navigator.userAgent;
+        var edge = ua.indexOf('Edge');
+        return edge > -1;
+    }
+    exports.isEdge = isEdge;
+    function initMicrophone(robot) {
+        // TODO if (navigator.mediaDevices === undefined) {
+        //navigator.mediaDevices = {};
+        //}
+        navigator.mediaDevices.getUserMedia = navigator.mediaDevices.getUserMedia || navigator['webkitGetUserMedia'] || navigator['mozGetUserMedia'];
+        try {
+            // ask for an audio input
+            var mediaDevices = navigator.mediaDevices;
+            mediaDevices
+                .getUserMedia({
+                audio: {
+                    mandatory: {
+                        googEchoCancellation: 'false',
+                        googAutoGainControl: 'false',
+                        googNoiseSuppression: 'false',
+                        googHighpassFilter: 'false',
+                    },
+                    optional: [],
+                },
+            })
+                .then(function (stream) {
+                var mediaStreamSource = robot.webAudio.context.createMediaStreamSource(stream);
+                robot.sound = Volume.createAudioMeter(robot.webAudio.context);
+                mediaStreamSource.connect(robot.sound);
+            }, function () {
+                console.log('Sorry, but there is no microphone available on your system');
+            });
+        }
+        catch (e) {
+            console.log('Sorry, but there is no microphone available on your system');
+        }
+    }
+    exports.initMicrophone = initMicrophone;
+    var thisWebAudio;
+    function getWebAudio() {
+        if (!thisWebAudio) {
+            thisWebAudio = {};
+            var AudioContext = window.AudioContext || window['webkitAudioContext'] || false;
+            if (AudioContext) {
+                thisWebAudio.context = new AudioContext();
+            }
+            else {
+                thisWebAudio.context = null;
+                thisWebAudio.oscillator = null;
+                console.log('Sorry, but the Web Audio API is not supported by your browser. Please, consider upgrading to the latest version or downloading Google Chrome or Mozilla Firefox');
+            }
+        }
+        return thisWebAudio;
+    }
+    exports.getWebAudio = getWebAudio;
+    function extendMouseEvent(e, scale, $layer) {
+        var X = e.clientX || e.originalEvent.touches[0].pageX;
+        var Y = e.clientY || e.originalEvent.touches[0].pageY;
+        var top = $layer.offset().top;
+        var left = $layer.offset().left;
+        e.startX = (X - left) / scale;
+        e.startY = (Y - top) / scale;
+    }
+    exports.extendMouseEvent = extendMouseEvent;
     function toFixedPrecision(value, precision) {
         var power = Math.pow(10, precision || 0);
         return String(Math.round(value * power) / power);
     }
     exports.toFixedPrecision = toFixedPrecision;
+    function addVariableValue($elem, name, value) {
+        switch (typeof value) {
+            case 'number': {
+                $elem.append('<div><label>' + name + ' :  </label><span> ' + round(value, 2) + '</span></div>');
+                break;
+            }
+            case 'string':
+            case 'boolean': {
+                $elem.append('<div><label>' + name + ' :  </label><span> ' + value + '</span></div>');
+                break;
+            }
+            case 'object': {
+                for (var i = 0; i < value.length; i++) {
+                    addVariableValue($elem, name + ' [' + String(i) + ']', value[i]);
+                }
+                break;
+            }
+        }
+    }
+    exports.addVariableValue = addVariableValue;
 });

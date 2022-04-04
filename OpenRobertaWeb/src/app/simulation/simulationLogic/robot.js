@@ -1,5 +1,4 @@
 import * as SIM from 'simulation.simulation';
-import CONSTANTS from 'simulation.constants';
 
 /**
  * Creates a new robot for a simulation.

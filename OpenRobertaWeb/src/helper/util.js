@@ -8,6 +8,35 @@ import CONST from 'simulation.constants';
 import * as GUISTATE_C from 'guiState.controller';
 import * as WEBOTSIM from 'webots.simulation';
 
+export function getLinesFromRectangle(myObj) {
+    return [
+        {
+            x1: myObj.x,
+            x2: myObj.x,
+            y1: myObj.y,
+            y2: myObj.y + myObj.h,
+        },
+        {
+            x1: myObj.x,
+            x2: myObj.x + myObj.w,
+            y1: myObj.y,
+            y2: myObj.y,
+        },
+        {
+            x1: myObj.x + myObj.w,
+            x2: myObj.x,
+            y1: myObj.y + myObj.h,
+            y2: myObj.y + myObj.h,
+        },
+        {
+            x1: myObj.x + myObj.w,
+            x2: myObj.x + myObj.w,
+            y1: myObj.y + myObj.h,
+            y2: myObj.y,
+        },
+    ];
+}
+
 const ANIMATION_DURATION = CONST.ANIMATION_DURATION;
 
 var ratioWorkspace = 1;
@@ -222,16 +251,24 @@ function setFocusOnElement($elem) {
 
 function showSingleModal(customize, onSubmit, onHidden, validator) {
     customize();
-    $('#single-modal-form').onWrap('submit', function (e) {
-        e.preventDefault();
-        onSubmit();
-    });
-    $('#single-modal').onWrap('hidden.bs.modal', function () {
-        $('#single-modal-form').off('submit');
-        $('#singleModalInput').val('');
-        $('#single-modal-form').validate().resetForm();
-        onHidden();
-    });
+    $('#single-modal-form').onWrap(
+        'submit',
+        function (e) {
+            e.preventDefault();
+            onSubmit();
+        },
+        'sim start clicked'
+    );
+    $('#single-modal').onWrap(
+        'hidden.bs.modal',
+        function () {
+            $('#single-modal-form').off('submit');
+            $('#singleModalInput').val('');
+            $('#single-modal-form').validate().resetForm();
+            onHidden();
+        },
+        'sim start clicked'
+    );
     $('#single-modal-form').removeData('validator');
     $('#single-modal-form').validate(validator);
     setFocusOnElement($('#singleModalInput'));
@@ -239,14 +276,22 @@ function showSingleModal(customize, onSubmit, onHidden, validator) {
 }
 
 function showSingleListModal(customize, onSubmit, onHidden, validator) {
-    $('#single-modal-list-form').onWrap('submit', function (e) {
-        e.preventDefault();
-        onSubmit();
-    });
-    $('#single-modal-list').onWrap('hidden.bs.modal', function () {
-        $('#single-modal-list-form').unbind('submit');
-        onHidden();
-    });
+    $('#single-modal-list-form').onWrap(
+        'submit',
+        function (e) {
+            e.preventDefault();
+            onSubmit();
+        },
+        'sim start clicked'
+    );
+    $('#single-modal-list').onWrap(
+        'hidden.bs.modal',
+        function () {
+            $('#single-modal-list-form').unbind('submit');
+            onHidden();
+        },
+        'sim start clicked'
+    );
     setFocusOnElement($('#singleModalListInput'));
     $('#single-modal-list').modal('show');
 }
@@ -581,7 +626,7 @@ $.fn.closeRightView = function (opt_callBack) {
                 that.width($('#main-section').outerWidth() - now);
                 $('.rightMenuButton').css('right', now);
                 ratioWorkspace = $('#blockly').outerWidth() / $('#main-section').outerWidth();
-                $(window).resize();
+                $(window).trigger('resize');
             },
             done: function () {
                 that.width($('#main-section').outerWidth());
@@ -591,7 +636,7 @@ $.fn.closeRightView = function (opt_callBack) {
                 that.removeClass('rightActive');
                 $('.fromRight.rightActive').removeClass('rightActive');
                 $('#sliderDiv').hide();
-                $(window).resize();
+                $(window).trigger('resize');
                 if (typeof opt_callBack == 'function') {
                     opt_callBack();
                 }
@@ -625,7 +670,7 @@ $.fn.openRightView = function (viewName, initialViewWidth, opt_callBack) {
         $('.fromRight.rightActive').removeClass('rightActive');
         $('.rightMenuButton.rightActive').removeClass('rightActive');
         $('#' + viewName + 'Div, #' + buttonName + 'Button').addClass('rightActive');
-        $(window).resize();
+        $(window).trigger('resize');
         if (smallScreen) {
             $('.blocklyToolboxDiv').css('display', 'none');
         }
@@ -653,14 +698,14 @@ $.fn.openRightView = function (viewName, initialViewWidth, opt_callBack) {
                 that.width($('#main-section').outerWidth() - now);
                 $('.rightMenuButton').css('right', now);
                 ratioWorkspace = $('#blockly').outerWidth() / $('#main-section').outerWidth();
-                $(window).resize();
+                $(window).trigger('resize');
             },
             done: function () {
                 $('#sliderDiv').show();
                 that.width($('#main-section').outerWidth() - $('.fromRight.rightActive').width());
                 $('.rightMenuButton').css('right', $('.fromRight.rightActive').width());
                 ratioWorkspace = $('#blockly').outerWidth() / $('#main-section').outerWidth();
-                $(window).resize();
+                $(window).trigger('resize');
                 if (smallScreen) {
                     $('.blocklyToolboxDiv').css('display', 'none');
                 }
@@ -678,7 +723,7 @@ $.fn.openRightView = function (viewName, initialViewWidth, opt_callBack) {
     );
 };
 
-$(window).resize(function () {
+$(window).on('resize', function () {
     var parentWidth = $('#main-section').outerWidth();
     var height = Math.max($('#blockly').outerHeight(), $('#brickly').outerHeight());
 
@@ -798,6 +843,9 @@ function removeLinks($elem) {
         });
 }
 
+export function checkInCircle(px, py, cx, cy, r) {
+    return (px - cx) * (px - cx) + (py - cy) * (py - cy) <= r * r;
+}
 /**
  * open simRobotWindow if it was previously closed with
  * closeSimRobotWindow() and the robot has not been changed
@@ -851,9 +899,107 @@ function closeSimRobotWindow(duration) {
     );
 }
 
+export function isIE() {
+    var ua = window.navigator.userAgent;
+    var ie = ua.indexOf('MSIE ');
+    var ie11 = ua.indexOf('Trident/');
+
+    if (ie > -1 || ie11 > -1) {
+        return true;
+    }
+    return false;
+}
+
+export function isEdge() {
+    var ua = window.navigator.userAgent;
+    var edge = ua.indexOf('Edge');
+    return edge > -1;
+}
+export function initMicrophone(robot) {
+    // TODO if (navigator.mediaDevices === undefined) {
+    //navigator.mediaDevices = {};
+    //}
+    navigator.mediaDevices.getUserMedia = navigator.mediaDevices.getUserMedia || navigator['webkitGetUserMedia'] || navigator['mozGetUserMedia'];
+
+    try {
+        // ask for an audio input
+        const mediaDevices = navigator.mediaDevices;
+        mediaDevices
+            .getUserMedia({
+                audio: {
+                    mandatory: {
+                        googEchoCancellation: 'false',
+                        googAutoGainControl: 'false',
+                        googNoiseSuppression: 'false',
+                        googHighpassFilter: 'false',
+                    },
+                    optional: [],
+                },
+            })
+            .then(
+                function (stream) {
+                    var mediaStreamSource = robot.webAudio.context.createMediaStreamSource(stream);
+                    robot.sound = Volume.createAudioMeter(robot.webAudio.context);
+                    mediaStreamSource.connect(robot.sound);
+                },
+                function () {
+                    console.log('Sorry, but there is no microphone available on your system');
+                }
+            );
+    } catch (e) {
+        console.log('Sorry, but there is no microphone available on your system');
+    }
+}
+var thisWebAudio;
+export function getWebAudio() {
+    if (!thisWebAudio) {
+        thisWebAudio = {};
+        var AudioContext = window.AudioContext || window['webkitAudioContext'] || false;
+        if (AudioContext) {
+            thisWebAudio.context = new AudioContext();
+        } else {
+            thisWebAudio.context = null;
+            thisWebAudio.oscillator = null;
+            console.log(
+                'Sorry, but the Web Audio API is not supported by your browser. Please, consider upgrading to the latest version or downloading Google Chrome or Mozilla Firefox'
+            );
+        }
+    }
+    return thisWebAudio;
+}
+
+export function extendMouseEvent(e, scale, $layer) {
+    let X = e.clientX || e.originalEvent.touches[0].pageX;
+    let Y = e.clientY || e.originalEvent.touches[0].pageY;
+    let top = $layer.offset().top;
+    let left = $layer.offset().left;
+    e.startX = (X - left) / scale;
+    e.startY = (Y - top) / scale;
+}
+
 function toFixedPrecision(value, precision) {
     var power = Math.pow(10, precision || 0);
     return String(Math.round(value * power) / power);
+}
+
+export function addVariableValue($elem, name, value) {
+    switch (typeof value) {
+        case 'number': {
+            $elem.append('<div><label>' + name + ' :  </label><span> ' + round(value, 2) + '</span></div>');
+            break;
+        }
+        case 'string':
+        case 'boolean': {
+            $elem.append('<div><label>' + name + ' :  </label><span> ' + value + '</span></div>');
+            break;
+        }
+        case 'object': {
+            for (var i = 0; i < value.length; i++) {
+                addVariableValue($elem, name + ' [' + String(i) + ']', value[i]);
+            }
+            break;
+        }
+    }
 }
 
 export {
@@ -887,5 +1033,5 @@ export {
     removeLinks,
     openSimRobotWindow,
     closeSimRobotWindow,
-    toFixedPrecision
+    toFixedPrecision,
 };

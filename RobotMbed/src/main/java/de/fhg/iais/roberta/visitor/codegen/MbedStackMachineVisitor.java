@@ -352,7 +352,6 @@ public class MbedStackMachineVisitor<V> extends AbstractStackMachineVisitor<V> i
     public V visitBothMotorsOnAction(BothMotorsOnAction<V> bothMotorsOnAction) {
         bothMotorsOnAction.getSpeedA().accept(this);
         bothMotorsOnAction.getSpeedB().accept(this);
-        app(makeNode(C.EXPR).put(C.EXPR, C.NUM_CONST).put(C.VALUE, 0));
 
         String portA = bothMotorsOnAction.getPortA();
         ConfigurationComponent ccA = this.configuration.optConfigurationComponent(portA);

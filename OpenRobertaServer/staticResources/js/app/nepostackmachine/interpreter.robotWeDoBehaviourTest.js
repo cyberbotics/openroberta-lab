@@ -75,7 +75,7 @@ define(["require", "exports", "./interpreter.aRobotBehaviour", "./interpreter.co
             U.info(robotText + ' piezo: ' + ', frequency: ' + frequency + ', duration: ' + duration);
             return duration;
         };
-        RobotWeDoBehaviourTest.prototype.motorOnAction = function (name, port, duration, speed) {
+        RobotWeDoBehaviourTest.prototype.motorOnAction = function (name, port, durationType, duration, speed, time) {
             var robotText = 'robot: ' + name + ', port: ' + port;
             var durText = duration === undefined ? ' w.o. duration' : ' for ' + duration + ' msec';
             U.info(robotText + ' motor speed ' + speed + durText);

@@ -1,4 +1,3 @@
-import * as SIM from 'simulation.simulation';
 import * as C from 'interpreter.constants';
 import * as UTIL from 'util';
 import Robot from 'simulation.robot';

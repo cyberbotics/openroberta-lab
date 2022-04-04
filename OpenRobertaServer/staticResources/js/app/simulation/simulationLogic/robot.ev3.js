@@ -553,7 +553,7 @@ define(["require", "exports", "simulation.simulation", "interpreter.constants", 
         }
         var sin = Math.sin(this.pose.theta);
         var cos = Math.cos(this.pose.theta);
-        this.frontRight = this.translate(sin, cos, this.frontRight);
+        this.mfrontRight = this.translate(sin, cos, this.frontRight);
         this.frontLeft = this.translate(sin, cos, this.frontLeft);
         this.backRight = this.translate(sin, cos, this.backRight);
         this.backLeft = this.translate(sin, cos, this.backLeft);

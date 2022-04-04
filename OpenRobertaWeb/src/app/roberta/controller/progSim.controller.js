@@ -1,7 +1,7 @@
 import * as MSG from 'message';
 import * as UTIL from 'util';
 import * as NAOSIM from 'webots.simulation';
-import * as SIM from 'simulation.simulation';
+import { Simulation } from 'simulation.simulation';
 import CONST from 'simulation.constants';
 import * as GUISTATE_C from 'guiState.controller';
 import * as NN_CTRL from 'nn.controller';
@@ -11,39 +11,51 @@ import * as PROGRAM from 'program.model';
 import * as Blockly from 'blockly';
 import * as $ from 'jquery';
 import 'jquery-validate';
+import { SimObjectShape } from 'simulation.objects';
 
 const INITIAL_WIDTH = 0.5;
 var blocklyWorkspace;
 var debug = false;
+var SIM;
 
 function init() {
+    SIM = Simulation.Instance;
     blocklyWorkspace = GUISTATE_C.getBlocklyWorkspace();
     initEvents();
 }
+
 export { init };
 
 function initEvents() {
     $('#simButton').off('click touchend');
-    $('#simButton').onWrap('click touchend', function (event) {
-        debug = false;
-        // Workaround for IOS speech synthesis, speech must be triggered once by a button click explicitly before it can be used programmatically
-        if (window.speechSynthesis && GUISTATE_C.getRobot().indexOf('ev3') !== -1) {
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
-        }
-        toggleSim();
-        return false;
-    });
+    $('#simButton').onWrap(
+        'click touchend',
+        function (event) {
+            debug = false;
+            // Workaround for IOS speech synthesis, speech must be triggered once by a button click explicitly before it can be used programmatically
+            if (window.speechSynthesis && GUISTATE_C.getRobot().indexOf('ev3') !== -1) {
+                window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+            }
+            toggleSim();
+            return false;
+        },
+        'sim start clicked'
+    );
 
     $('#simDebugButton').off('click touchend');
-    $('#simDebugButton').onWrap('click touchend', function (event) {
-        debug = true;
-        // Workaround for IOS speech synthesis, speech must be triggered once by a button click explicitly before it can be used programmatically
-        if (window.speechSynthesis && GUISTATE_C.getRobot().indexOf('ev3') !== -1) {
-            window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
-        }
-        toggleSim();
-        return false;
-    });
+    $('#simDebugButton').onWrap(
+        'click touchend',
+        function (event) {
+            debug = true;
+            // Workaround for IOS speech synthesis, speech must be triggered once by a button click explicitly before it can be used programmatically
+            if (window.speechSynthesis && GUISTATE_C.getRobot().indexOf('ev3') !== -1) {
+                window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+            }
+            toggleSim();
+            return false;
+        },
+        'sim start clicked'
+    );
 
     $('#simStop').onWrap(
         'click',
@@ -59,7 +71,7 @@ function initEvents() {
         function (event) {
             event.stopPropagation();
 
-            if (SIM.getNumRobots() <= 1) {
+            if (SIM.interpreters.length <= 1) {
                 if (SIM.getDebugMode()) {
                     toggleSimEvent(CONST.DEBUG_BREAKPOINT);
                 } else {
@@ -88,7 +100,7 @@ function initEvents() {
                                     NAOSIM.run(result.javaScriptProgram);
                                 } else {
                                     setTimeout(function () {
-                                        SIM.setPause(false);
+                                        SIM.resumeInterpreters();
                                     }, 500);
                                     SIM.init([result], false, GUISTATE_C.getRobotGroup());
                                 }
@@ -112,9 +124,10 @@ function initEvents() {
                     MSG.displayMessage('MESSAGE_EDIT_START', 'TOAST', 'multiple simulation');
                     $('#simControl').addClass('typcn-media-stop').removeClass('typcn-media-play-outline');
                     $('#simControl').attr('data-original-title', Blockly.Msg.MENU_SIM_STOP_TOOLTIP);
+
                     SIM.run(false, GUISTATE_C.getRobotGroup());
                     setTimeout(function () {
-                        SIM.setPause(false);
+                        SIM.resumeInterpreters();
                     }, 500);
                 } else {
                     $('#simControl').addClass('typcn-media-play-outline').removeClass('typcn-media-stop');
@@ -125,12 +138,13 @@ function initEvents() {
         },
         'sim start clicked'
     );
+
     $('#simImport').onWrap(
         'click',
         function (event) {
             SIM.importImage();
         },
-        'simImport clicked'
+        'sim start clicked'
     );
 
     $('.simInfo').onWrap(
@@ -138,62 +152,78 @@ function initEvents() {
         function (event) {
             SIM.setInfo();
         },
-        'sim info clicked'
+        'sim start clicked'
     );
 
-    $('#simRobot').onWrap('click', function (event) {
-        var robot = GUISTATE_C.getRobot();
-        var position = $('#simDiv').position();
+    $('#simRobot').onWrap(
+        'click',
+        function (event) {
+            var robot = GUISTATE_C.getRobot();
+            var position = $('#simDiv').position();
 
-        if (robot == 'calliope2016' || robot == 'calliope2017' || robot == 'calliope2017NoBlue' || robot == 'microbit') {
-            position.left = $('#blocklyDiv').width() + 12;
-        } else {
-            position.left += 48;
-        }
-        toggleRobotWindow('#simRobotWindow', position);
-    }, 'sim show robot clicked');
+            if (robot == 'calliope2016' || robot == 'calliope2017' || robot == 'calliope2017NoBlue' || robot == 'microbit') {
+                position.left = $('#blocklyDiv').width() + 12;
+            } else {
+                position.left += 48;
+            }
+            toggleRobotWindow('#simRobotWindow', position);
+        },
+        'sim toggle robot view clicked'
+    );
 
-    $('#simValues').onWrap('click', function(event) {
-        var position = $('#simDiv').position();
-        position.left = $(window).width() - ($('#simValuesWindow').width() + 12);
-        toggleRobotWindow('#simValuesWindow', position);
-    }, 'sim show values clicked');
+    $('#simValues').onWrap(
+        'click',
+        function (event) {
+            var position = $('#simDiv').position();
+            position.left = $(window).width() - ($('#simValuesWindow').width() + 12);
+            toggleRobotWindow('#simValuesWindow', position);
+        },
+        'sim start clicked'
+    );
 
     function toggleRobotWindow(id, position) {
         if ($(id).is(':hidden')) {
             $(id).css({
                 top: position.top + 12,
-                left: position.left
+                left: position.left,
             });
         }
-        $(id).animate({
-            'opacity': 'toggle',
-            'top': 'toggle'
-        }, 300);
-        $(id).draggable(
+        $(id).animate(
             {
-                constraint: 'window'
-            }
+                opacity: 'toggle',
+                top: 'toggle',
+            },
+            300
         );
+        $(id).draggable({
+            constraint: 'window',
+        });
     }
 
-    $('.simWindow .close').onWrap('click', function(event) {
-        $($(this).parents('.simWindow:first')).animate({
-            'opacity': 'hide',
-            'top': 'hide'
-        }, 300);
-    }, 'sim close robotWindow clicked');
+    $('.simWindow .close').onWrap(
+        'click',
+        function (event) {
+            $($(this).parents('.simWindow:first')).animate(
+                {
+                    opacity: 'hide',
+                    top: 'hide',
+                },
+                300
+            );
+        },
+        'sim start clicked'
+    );
 
     $('#simResetPose').onWrap(
         'click',
-        function(event) {
+        function (event) {
             if (GUISTATE_C.hasWebotsSim()) {
                 NAOSIM.resetPose();
                 return;
             }
             SIM.resetPose();
         },
-        'sim reset pose clicked'
+        'sim start clicked'
     );
 
     $('#simControlStepInto').onWrap(
@@ -201,7 +231,7 @@ function initEvents() {
         function (event) {
             toggleSimEvent(CONST.DEBUG_STEP_INTO);
         },
-        'sim step into clicked'
+        'sim start clicked'
     );
 
     $('#simControlStepOver').onWrap(
@@ -209,60 +239,77 @@ function initEvents() {
         function (event) {
             toggleSimEvent(CONST.DEBUG_STEP_OVER);
         },
-        'sim step over clicked'
+        'sim start clicked'
     );
 
     $('#simAddObstacleRectangle').onWrap(
         'click',
         function (event) {
-            SIM.addObstacle('rectangle');
+            SIM.addObstacle(SimObjectShape.Rectangle);
             event.stopPropagation();
         },
-        'sim add rectangle obstacle clicked'
+        'sim start clicked'
     );
 
     $('#simAddObstacleTriangle').onWrap(
         'click',
         function (event) {
-            SIM.addObstacle('triangle');
+            SIM.addObstacle(SimObjectShape.Triangle);
         },
-        'sim add triangle obstacle clicked'
+        'sim start clicked'
     );
 
     $('#simAddObstacleCircle').onWrap(
         'click',
         function (event) {
-            SIM.addObstacle('circle');
+            SIM.addObstacle(SimObjectShape.Circle);
             event.stopPropagation();
         },
-        'sim add circle obstacle clicked'
+        'sim start clicked'
+    );
+    $('#simObstacleDeleteAll').onWrap(
+        'click',
+        function (event) {
+            SIM.deleteAllObstacle();
+            event.stopPropagation();
+        },
+        'sim start clicked'
     );
 
     $('#simAddAreaRectangle').onWrap(
         'click',
         function (event) {
-            SIM.addColorArea('rectangle');
+            SIM.addColorArea(SimObjectShape.Rectangle);
             event.stopPropagation();
         },
-        'sim add rectangle area clicked'
+        'sim start clicked'
     );
 
     $('#simAddAreaTriangle').onWrap(
         'click',
         function (event) {
-            SIM.addColorArea('triangle');
+            SIM.addColorArea(SimObjectShape.Triangle);
             event.stopPropagation();
         },
-        'sim add triangle area clicked'
+        'sim start clicked'
     );
 
     $('#simAddAreaCircle').onWrap(
         'click',
         function (event) {
-            SIM.addColorArea('circle');
+            SIM.addColorArea(SimObjectShape.Circle);
             event.stopPropagation();
         },
-        'sim add circle area clicked'
+        'sim start clicked'
+    );
+
+    $('#simAreaDeleteAll').onWrap(
+        'click',
+        function (event) {
+            SIM.deleteAllColorArea();
+            event.stopPropagation();
+        },
+        'sim start clicked'
     );
 
     $('#simChangeObjectColor').onWrap(
@@ -272,7 +319,7 @@ function initEvents() {
                 SIM.toggleColorPicker();
             }
         },
-        'sim edit object clicked'
+        'sim start clicked'
     );
 
     $('#simDeleteObject').onWrap(
@@ -282,7 +329,7 @@ function initEvents() {
                 SIM.deleteSelectedObject();
             }
         },
-        'sim delete object clicked'
+        'sim start clicked'
     );
 
     $('#simDownloadConfig').onWrap(
@@ -292,7 +339,7 @@ function initEvents() {
             UTIL.download(filename, JSON.stringify(SIM.exportConfigData()));
             MSG.displayMessage('MENU_MESSAGE_DOWNLOAD', 'TOAST', filename);
         },
-        'sim download config clicked'
+        'sim start clicked'
     );
 
     $('#simUploadConfig').onWrap(
@@ -300,15 +347,24 @@ function initEvents() {
         function (event) {
             SIM.importConfigData();
         },
-        'sim upload config clicked'
+        'sim start clicked'
     );
 
     $('#simScene').onWrap(
         'click',
         function (event) {
-            SIM.setBackground(-1, SIM.setBackground);
+            SIM.setBackground(-1);
         },
-        'sim toggle background clicked'
+        'sim step background'
+    );
+    $('#simTrail').onWrap(
+        'click',
+        function (event) {
+            $(this).toggleClass('typcn-chart-line-outline');
+            $(this).toggleClass('typcn-chart-line');
+            SIM.toggleTrail();
+        },
+        'sim toggle trail'
     );
 }
 
@@ -350,11 +406,11 @@ function toggleSim() {
     }
 
     if (($('#simButton').hasClass('rightActive') && !debug) || ($('#simDebugButton').hasClass('rightActive') && debug)) {
-        if (!GUISTATE_C.hasWebotsSim()) {
-            SIM.cancel();
-        }
+        //if (!GUISTATE_C.hasWebotsSim()) {
+        SIM.stop();
+        //}
         $('#simControl').addClass('typcn-media-play-outline').removeClass('typcn-media-play').removeClass('typcn-media-stop');
-        $('#blockly').closeRightView(function() {
+        $('#blockly').closeRightView(function () {
             $('.nav > li > ul > .robotType').removeClass('disabled');
             $('.' + GUISTATE_C.getRobot()).addClass('disabled');
         });
@@ -407,7 +463,7 @@ function toggleSimEvent(event) {
             $('#simStop').removeClass('disabled');
         });
     } else if ($('#simControl').hasClass('typcn-media-play')) {
-        SIM.setPause(false);
+        SIM.resumeInterpreters();
         SIM.interpreterAddEvent(event);
     } else {
         if ($('#simControl').hasClass('typcn-media-stop')) {
