@@ -1,15 +1,15 @@
-package de.fhg.iais.roberta.syntax.sensor.mbot2;
+package de.fhg.iais.roberta.syntax.sensor.thymio;
 
 import de.fhg.iais.roberta.blockly.generated.Hide;
-import de.fhg.iais.roberta.syntax.BlockType;
-import de.fhg.iais.roberta.syntax.BlocklyBlockProperties;
-import de.fhg.iais.roberta.syntax.BlocklyComment;
-import de.fhg.iais.roberta.syntax.BlocklyConstants;
-import de.fhg.iais.roberta.syntax.WithUserDefinedPort;
-import de.fhg.iais.roberta.syntax.sensor.Sensor;
+import de.fhg.iais.roberta.util.syntax.BlockType;
+import de.fhg.iais.roberta.util.syntax.BlocklyBlockProperties;
+import de.fhg.iais.roberta.util.syntax.BlocklyComment;
+import de.fhg.iais.roberta.util.syntax.BlocklyConstants;
+import de.fhg.iais.roberta.util.syntax.WithUserDefinedPort;
 import de.fhg.iais.roberta.transformer.NepoField;
 import de.fhg.iais.roberta.transformer.NepoHide;
 import de.fhg.iais.roberta.transformer.NepoPhrase;
+import de.fhg.iais.roberta.syntax.sensor.Sensor;
 
 @NepoPhrase(containerType = "SOUND_RECORD")
 public class SoundRecord<V> extends Sensor<V> implements WithUserDefinedPort<V> {

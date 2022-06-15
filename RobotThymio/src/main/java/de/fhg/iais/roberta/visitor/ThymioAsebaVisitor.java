@@ -6,26 +6,35 @@ import com.google.common.collect.ClassToInstanceMap;
 
 import de.fhg.iais.roberta.bean.CodeGeneratorSetupBean;
 import de.fhg.iais.roberta.bean.IProjectBean;
-import de.fhg.iais.roberta.bean.UsedHardwareBean;
 import de.fhg.iais.roberta.components.ConfigurationAst;
-import de.fhg.iais.roberta.components.ConfigurationComponent;
 import de.fhg.iais.roberta.constants.ThymioConstants;
 import de.fhg.iais.roberta.inter.mode.action.IDriveDirection;
-import de.fhg.iais.roberta.syntax.MotionParam;
 import de.fhg.iais.roberta.syntax.Phrase;
-import de.fhg.iais.roberta.syntax.SC;
+import de.fhg.iais.roberta.syntax.action.motor.MotorGetPowerAction;
+import de.fhg.iais.roberta.syntax.action.motor.MotorOnAction;
+import de.fhg.iais.roberta.syntax.action.motor.MotorSetPowerAction;
+import de.fhg.iais.roberta.syntax.action.motor.MotorStopAction;
+import de.fhg.iais.roberta.syntax.action.motor.differential.CurveAction;
+import de.fhg.iais.roberta.syntax.action.motor.differential.DriveAction;
+import de.fhg.iais.roberta.syntax.action.motor.differential.MotorDriveStopAction;
 import de.fhg.iais.roberta.syntax.action.motor.differential.TurnAction;
+import de.fhg.iais.roberta.syntax.action.serial.SerialWriteAction;
+import de.fhg.iais.roberta.syntax.configuration.ConfigurationComponent;
 import de.fhg.iais.roberta.syntax.lang.blocksequence.MainTask;
 import de.fhg.iais.roberta.syntax.lang.expr.ColorConst;
 import de.fhg.iais.roberta.syntax.lang.expr.ConnectConst;
 import de.fhg.iais.roberta.syntax.lang.expr.RgbColor;
 import de.fhg.iais.roberta.syntax.lang.stmt.StmtList;
+import de.fhg.iais.roberta.syntax.lang.stmt.TernaryExpr;
 import de.fhg.iais.roberta.syntax.lang.stmt.WaitStmt;
 import de.fhg.iais.roberta.syntax.lang.stmt.WaitTimeStmt;
 import de.fhg.iais.roberta.syntax.sensor.generic.TimerSensor;
 import de.fhg.iais.roberta.util.dbc.DbcException;
+import de.fhg.iais.roberta.util.syntax.MotionParam;
+import de.fhg.iais.roberta.util.syntax.SC;
+import de.fhg.iais.roberta.visitor.hardware.actor.IDifferentialMotorVisitor;
 
-public final class ThymioAsebaVisitor extends AbstractAsebaVisitor {//} implements IMbot2Visitor<Void> {
+public final class ThymioAsebaVisitor extends AbstractAsebaVisitor implements IDifferentialMotorVisitor<Void> {//} implements IMbot2Visitor<Void> {
 
     private final ConfigurationAst configurationAst;
     private String rightMotorPort;
@@ -35,6 +44,55 @@ public final class ThymioAsebaVisitor extends AbstractAsebaVisitor {//} implemen
         super(programPhrases, beans);
         this.configurationAst = configurationAst;
 //        setRightMotorPort();
+    }
+
+    @Override
+    public Void visitDriveAction(DriveAction<Void> driveAction) {
+        String multiplier = driveAction.getDirection().toString().equals(SC.FOREWARD) ? "" : "-";
+        this.sb.append("motor.left.target = ").append(multiplier);
+        driveAction.getParam().getSpeed().accept(this);
+        nlIndent();
+        this.sb.append("motor.right.target = ").append(multiplier);
+        driveAction.getParam().getSpeed().accept(this);
+        return null;
+    }
+
+    @Override
+    public Void visitCurveAction(CurveAction<Void> curveAction) {
+        return null;
+    }
+
+    @Override
+    public Void visitMotorGetPowerAction(MotorGetPowerAction<Void> motorGetPowerAction) {
+        return null;
+    }
+
+    @Override
+    public Void visitMotorOnAction(MotorOnAction<Void> motorOnAction) {
+        return null;
+    }
+
+    @Override
+    public Void visitMotorSetPowerAction(MotorSetPowerAction<Void> motorSetPowerAction) {
+        return null;
+    }
+
+    @Override
+    public Void visitMotorStopAction(MotorStopAction<Void> motorStopAction) {
+        return null;
+    }
+
+    @Override
+    public Void visitTurnAction(TurnAction<Void> turnAction) {
+        return null;
+    }
+
+    @Override
+    public Void visitMotorDriveStopAction(MotorDriveStopAction<Void> stopAction) {
+        this.sb.append("motor.left.target = 0");
+        nlIndent();
+        this.sb.append("motor.right.target = 0");
+        return null;
     }
 
     @Override
@@ -68,11 +126,11 @@ public final class ThymioAsebaVisitor extends AbstractAsebaVisitor {//} implemen
             nlIndent();
             double circumference = 6.5 * Math.PI;
             double trackWidth = 11.5;
-            this.sb.append("_trackWidth = ");
-            this.sb.append(trackWidth);
+            this.sb.append("var _trackWidth = ");
+            this.sb.append((int) Math.floor(trackWidth));
             nlIndent();
-            this.sb.append("_circumference = ");
-            this.sb.append(circumference);
+            this.sb.append("var _circumference = ");
+            this.sb.append((int) Math.floor(circumference));
             nlIndent();
         }
     }
@@ -96,13 +154,12 @@ public final class ThymioAsebaVisitor extends AbstractAsebaVisitor {//} implemen
         StmtList<Void> variables = mainTask.getVariables();
         variables.accept(this);
         generateUserDefinedMethods();
-        nlIndent();
-        this.sb.append("def run():");
-        incrIndentation();
-        if ( !this.usedGlobalVarInFunctions.isEmpty() ) {
-            nlIndent();
-            this.sb.append("global ").append(String.join(", ", this.usedGlobalVarInFunctions));
-        }
+//        this.sb.append("def run():");
+//        incrIndentation();
+//        if ( !this.usedGlobalVarInFunctions.isEmpty() ) {
+//            nlIndent();
+//            this.sb.append("global ").append(String.join(", ", this.usedGlobalVarInFunctions));
+//        }
 
         return null;
     }
@@ -112,34 +169,6 @@ public final class ThymioAsebaVisitor extends AbstractAsebaVisitor {//} implemen
         if ( !withWrapping ) {
             return;
         }
-        decrIndentation(); // everything is still indented from main program
-        nlIndent();
-        nlIndent();
-        this.sb.append("def main():");
-        incrIndentation();
-        nlIndent();
-        this.sb.append("try:");
-        incrIndentation();
-        nlIndent();
-        this.sb.append("run()");
-        decrIndentation();
-        nlIndent();
-        this.sb.append("except Exception as e:");
-        incrIndentation();
-        nlIndent();
-        this.sb.append("raise");
-        decrIndentation();
-        if ( this.getBean(UsedHardwareBean.class).isActorUsed(SC.ENCODER) ) {
-            nlIndent();
-            this.sb.append("finally:");
-            incrIndentation();
-            nlIndent();
-            this.sb.append("mbot2.motor_stop(\"all\")");
-            nlIndent();
-            this.sb.append("mbot2.EM_stop(\"all\")");
-            decrIndentation();
-        }
-        decrIndentation();
         nlIndent();
         nlIndent();
         this.sb.append("</node>");
@@ -196,6 +225,7 @@ public final class ThymioAsebaVisitor extends AbstractAsebaVisitor {//} implemen
         return null;
     }
 
+
     @Override
     public Void visitTimerSensor(TimerSensor<Void> timerSensor) {
         switch ( timerSensor.getMode() ) {
@@ -230,6 +260,11 @@ public final class ThymioAsebaVisitor extends AbstractAsebaVisitor {//} implemen
     }
 
     @Override
+    public Void visitSerialWriteAction(SerialWriteAction<Void> serialWriteAction) {
+        return null;
+    }
+
+    @Override
     public Void visitColorConst(ColorConst<Void> colorConst) {
         this.sb.append("(").append(colorConst.getRedChannelInt()).append(", ").append(colorConst.getGreenChannelInt()).append(", ").append(colorConst.getBlueChannelInt()).append(")");
         return null;
@@ -245,5 +280,10 @@ public final class ThymioAsebaVisitor extends AbstractAsebaVisitor {//} implemen
         rgbColor.getB().accept(this);
         this.sb.append(")");
         return null;
+    }
+
+    @Override
+    protected void generateCodeFromTernary(TernaryExpr<Void> ternaryExpr) {
+
     }
 }

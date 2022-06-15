@@ -22,8 +22,11 @@ import static de.fhg.iais.roberta.mode.general.ListElementOperations.INSERT;
 import static de.fhg.iais.roberta.mode.general.ListElementOperations.REMOVE;
 import static de.fhg.iais.roberta.mode.general.ListElementOperations.SET;
 import de.fhg.iais.roberta.syntax.Phrase;
+import de.fhg.iais.roberta.syntax.action.serial.SerialWriteAction;
+import de.fhg.iais.roberta.syntax.lang.blocksequence.MainTask;
 import de.fhg.iais.roberta.syntax.lang.expr.Binary;
 import de.fhg.iais.roberta.syntax.lang.expr.BoolConst;
+import de.fhg.iais.roberta.syntax.lang.expr.ConnectConst;
 import de.fhg.iais.roberta.syntax.lang.expr.EmptyExpr;
 import de.fhg.iais.roberta.syntax.lang.expr.EmptyList;
 import de.fhg.iais.roberta.syntax.lang.expr.Expr;
@@ -34,7 +37,6 @@ import de.fhg.iais.roberta.syntax.lang.expr.NullConst;
 import de.fhg.iais.roberta.syntax.lang.expr.NumConst;
 import de.fhg.iais.roberta.syntax.lang.expr.Unary;
 import de.fhg.iais.roberta.syntax.lang.expr.VarDeclaration;
-import de.fhg.iais.roberta.syntax.lang.functions.FunctionNames;
 import de.fhg.iais.roberta.syntax.lang.functions.GetSubFunct;
 import de.fhg.iais.roberta.syntax.lang.functions.IndexOfFunct;
 import de.fhg.iais.roberta.syntax.lang.functions.LengthOfIsEmptyFunct;
@@ -66,8 +68,13 @@ import de.fhg.iais.roberta.syntax.lang.stmt.StmtFlowCon;
 import de.fhg.iais.roberta.syntax.lang.stmt.StmtFlowCon.Flow;
 import de.fhg.iais.roberta.syntax.lang.stmt.StmtList;
 import de.fhg.iais.roberta.syntax.lang.stmt.StmtTextComment;
+import de.fhg.iais.roberta.syntax.lang.stmt.TernaryExpr;
+import de.fhg.iais.roberta.syntax.lang.stmt.WaitStmt;
+import de.fhg.iais.roberta.syntax.lang.stmt.WaitTimeStmt;
+import de.fhg.iais.roberta.syntax.sensor.generic.TimerSensor;
 import de.fhg.iais.roberta.typecheck.BlocklyType;
 import de.fhg.iais.roberta.util.dbc.DbcException;
+import de.fhg.iais.roberta.util.syntax.FunctionNames;
 import de.fhg.iais.roberta.visitor.lang.codegen.AbstractLanguageVisitor;
 
 public abstract class AbstractAsebaVisitor extends AbstractLanguageVisitor {
@@ -75,12 +82,6 @@ public abstract class AbstractAsebaVisitor extends AbstractLanguageVisitor {
 
     protected AbstractAsebaVisitor(List<List<Phrase<Void>>> programPhrases, ClassToInstanceMap<IProjectBean> beans) {
         super(programPhrases, beans);
-    }
-
-    @Override
-    public Void visitNumConst(NumConst<Void> numConst) {
-        super.visitNumConst(numConst);
-        return null;
     }
 
     @Override
@@ -101,10 +102,7 @@ public abstract class AbstractAsebaVisitor extends AbstractLanguageVisitor {
 
     @Override
     public Void visitVarDeclaration(VarDeclaration<Void> var) {
-        this.usedGlobalVarInFunctions.add(var.getCodeSafeName());
-        this.sb.append("var ");
-        this.sb.append(var.getCodeSafeName());
-        this.sb.append(" = ");
+        this.sb.append("var ").append(var.getCodeSafeName()).append(" = ");
         if ( !var.getValue().getKind().hasName("EMPTY_EXPR") ) {
             if ( var.getValue().getKind().hasName("EXPR_LIST") ) {
                 ExprList<Void> list = (ExprList<Void>) var.getValue();
@@ -117,7 +115,7 @@ public abstract class AbstractAsebaVisitor extends AbstractLanguageVisitor {
                 var.getValue().accept(this);
             }
         } else {
-            this.sb.append("None");
+            this.sb.append("0");
         }
         return null;
     }
@@ -148,7 +146,7 @@ public abstract class AbstractAsebaVisitor extends AbstractLanguageVisitor {
                 this.sb.append("0");
                 break;
             case ARRAY:
-                this.sb.append("[]");
+                this.sb.append("[0]");
                 break;
             case NULL:
                 break;
@@ -163,36 +161,30 @@ public abstract class AbstractAsebaVisitor extends AbstractLanguageVisitor {
     public Void visitRepeatStmt(RepeatStmt<Void> repeatStmt) {
         boolean isWaitStmt = repeatStmt.getMode() == RepeatStmt.Mode.WAIT;
         switch ( repeatStmt.getMode() ) {
+            case FOREVER:
+                throw new DbcException("Infinite loops not allowed in Aseba!");
             case UNTIL:
             case WHILE:
-            case FOREVER:
                 generateCodeFromStmtCondition("while", repeatStmt.getExpr());
-                appendTry();
                 break;
             case TIMES:
             case FOR:
                 generateCodeFromStmtConditionFor("for", repeatStmt.getExpr());
-                appendTry();
                 break;
             case WAIT:
                 generateCodeFromStmtCondition("if", repeatStmt.getExpr());
                 break;
             case FOR_EACH:
                 generateCodeFromStmtCondition("for", repeatStmt.getExpr());
-                appendTry();
                 break;
             default:
                 throw new DbcException("Invalid Repeat Statement!");
         }
         incrIndentation();
-        appendPassIfEmptyBody(repeatStmt);
         repeatStmt.getList().accept(this);
-        if ( !isWaitStmt ) {
-            appendExceptionHandling();
-        } else {
-            appendBreakStmt(repeatStmt);
-        }
         decrIndentation();
+        nlIndent();
+        this.sb.append("end");
         return null;
     }
 
@@ -656,6 +648,41 @@ public abstract class AbstractAsebaVisitor extends AbstractLanguageVisitor {
     }
 
     @Override
+    public Void visitConnectConst(ConnectConst<Void> connectConst) {
+        return null;
+    }
+
+    @Override
+    public Void visitMainTask(MainTask<Void> mainTask) {
+        return null;
+    }
+
+    @Override
+    public Void visitTimerSensor(TimerSensor<Void> timerSensor) {
+        return null;
+    }
+
+    @Override
+    public Void visitWaitStmt(WaitStmt<Void> waitStmt) {
+        return null;
+    }
+
+    @Override
+    public Void visitWaitTimeStmt(WaitTimeStmt<Void> waitTimeStmt) {
+        return null;
+    }
+
+    @Override
+    public Void visitSerialWriteAction(SerialWriteAction<Void> serialWriteAction) {
+        return null;
+    }
+
+    @Override
+    protected void generateProgramPrefix(boolean withWrapping) {
+
+    }
+
+    @Override
     public String getEnumCode(IMode value) {
         return "'" + value.toString().toLowerCase() + "'";
     }
@@ -666,6 +693,10 @@ public abstract class AbstractAsebaVisitor extends AbstractLanguageVisitor {
     }
 
     @Override
+    protected void generateCodeFromTernary(TernaryExpr<Void> ternaryExpr) {
+        return;
+    }
+
     protected void generateCodeFromTernary(IfStmt<Void> ifStmt) {
         ((ExprStmt<Void>) ifStmt.getThenList().get(0).get().get(0)).getExpr().accept(this);
         this.sb.append(whitespace() + "if" + whitespace() + "(" + whitespace());
@@ -681,30 +712,28 @@ public abstract class AbstractAsebaVisitor extends AbstractLanguageVisitor {
             if ( i == 0 ) {
                 generateCodeFromStmtCondition("if", ifStmt.getExpr().get(i));
             } else {
-                nlIndent();
-                generateCodeFromStmtCondition("elif", ifStmt.getExpr().get(i));
+                generateCodeFromStmtCondition("elseif", ifStmt.getExpr().get(i));
             }
             incrIndentation();
             StmtList<Void> then = ifStmt.getThenList().get(i);
-            if ( then.get().isEmpty() ) {
-                nlIndent();
-                this.sb.append("pass");
-            } else {
+            if ( !then.get().isEmpty() ) {
                 then.accept(this);
             }
             decrIndentation();
+            nlIndent();
         }
     }
 
     @Override
     protected void generateCodeFromElse(IfStmt<Void> ifStmt) {
         if ( !ifStmt.getElseList().get().isEmpty() ) {
-            nlIndent();
-            this.sb.append("else:");
+            this.sb.append("else");
             incrIndentation();
             ifStmt.getElseList().accept(this);
             decrIndentation();
         }
+        nlIndent();
+        this.sb.append("end");
     }
 
     @Override
@@ -740,63 +769,25 @@ public abstract class AbstractAsebaVisitor extends AbstractLanguageVisitor {
     protected void generateCodeFromStmtCondition(String stmtType, Expr<Void> expr) {
         this.sb.append(stmtType).append(whitespace());
         expr.accept(this);
-        this.sb.append(":");
+        String thenOrDo = stmtType.equals("if") ? " then" : " do";
+        this.sb.append(thenOrDo);
     }
 
     protected void generateCodeFromStmtConditionFor(String stmtType, Expr<Void> expr) {
-        this.sb.append(stmtType).append(whitespace());
-        ExprList<Void> expressions = (ExprList<Void>) expr;
-        expressions.get().get(0).accept(this);
-        this.sb.append(whitespace() + "in range(int(");
-        expressions.get().get(1).accept(this);
-        this.sb.append(")," + whitespace() + "int(");
-        expressions.get().get(2).accept(this);
-        this.sb.append(")," + whitespace() + "int(");
-        expressions.get().get(3).accept(this);
-        this.sb.append(")):");
-    }
-
-    protected void appendBreakStmt(RepeatStmt<Void> repeatStmt) {
         nlIndent();
-        this.sb.append("break");
-    }
-
-    protected void appendTry() {
-        increaseLoopCounter();
-
-        if ( this.getBean(UsedHardwareBean.class).getLoopsLabelContainer().get(this.currentLoop.getLast()) ) {
-            incrIndentation();
-            nlIndent();
-            this.sb.append("try:");
-        }
-    }
-
-    protected void appendExceptionHandling() {
-        if ( this.getBean(UsedHardwareBean.class).getLoopsLabelContainer().get(this.currentLoop.getLast()) ) {
-            decrIndentation();
-            nlIndent();
-            this.sb.append("except BreakOutOfALoop:");
-            incrIndentation();
-            nlIndent();
-            this.sb.append("break");
-            decrIndentation();
-            nlIndent();
-            this.sb.append("except ContinueLoop:");
-            incrIndentation();
-            nlIndent();
-            this.sb.append("continue");
-            decrIndentation();
-        }
-        this.currentLoop.removeLast();
-    }
-
-    protected void appendPassIfEmptyBody(RepeatStmt<Void> repeatStmt) {
-        if ( repeatStmt.getList().get().isEmpty() ) {
-            if ( repeatStmt.getMode() != RepeatStmt.Mode.WAIT ) {
-                nlIndent();
-                this.sb.append("pass");
-            }
-        }
+        ExprList<Void> expressions = (ExprList<Void>) expr;
+        this.sb.append("var ");
+        expressions.get().get(0).accept(this);
+        nlIndent();
+        this.sb.append(stmtType).append(whitespace());
+        expressions.get().get(0).accept(this);
+        this.sb.append(whitespace()).append("in ");
+        expressions.get().get(1).accept(this);
+        this.sb.append(":");
+        expressions.get().get(2).accept(this);
+        this.sb.append(" step").append(whitespace());
+        expressions.get().get(3).accept(this);
+        this.sb.append(" do");
     }
 
     @Override

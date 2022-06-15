@@ -1,11 +1,13 @@
-package de.fhg.iais.roberta.syntax.action;
+package de.fhg.iais.roberta.syntax.action.thymio;
+
 
 import de.fhg.iais.roberta.blockly.generated.Hide;
-import de.fhg.iais.roberta.syntax.BlockType;
-import de.fhg.iais.roberta.syntax.BlocklyBlockProperties;
-import de.fhg.iais.roberta.syntax.BlocklyComment;
-import de.fhg.iais.roberta.syntax.BlocklyConstants;
-import de.fhg.iais.roberta.syntax.WithUserDefinedPort;
+import de.fhg.iais.roberta.util.syntax.BlockType;
+import de.fhg.iais.roberta.util.syntax.BlocklyBlockProperties;
+import de.fhg.iais.roberta.util.syntax.BlocklyComment;
+import de.fhg.iais.roberta.util.syntax.BlocklyConstants;
+import de.fhg.iais.roberta.util.syntax.WithUserDefinedPort;
+import de.fhg.iais.roberta.syntax.action.Action;
 import de.fhg.iais.roberta.syntax.lang.expr.Expr;
 import de.fhg.iais.roberta.transformer.NepoField;
 import de.fhg.iais.roberta.transformer.NepoHide;
@@ -13,6 +15,7 @@ import de.fhg.iais.roberta.transformer.NepoPhrase;
 import de.fhg.iais.roberta.transformer.NepoValue;
 import de.fhg.iais.roberta.typecheck.BlocklyType;
 import de.fhg.iais.roberta.util.dbc.Assert;
+
 
 @NepoPhrase(containerType = "CYBERPI_SET_BRIGHTNESS_ACTION")
 public class LedBrightnessAction<V> extends Action<V> implements WithUserDefinedPort<V> {
